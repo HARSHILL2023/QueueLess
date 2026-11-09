@@ -28,7 +28,9 @@ const requireHospitalStaff = (req, res, next) => {
     return res.status(403).json({ error: 'Access restricted to hospital staff members.' });
   }
 
-  const hospitalId = req.params.hospitalId || req.body.hospitalId || req.query.hospitalId;
+  // Express 5 leaves req.body undefined for PATCH requests without a payload,
+  // which previously crashed "Start Consultation" and "Mark No-Show".
+  const hospitalId = req.params.hospitalId || req.body?.hospitalId || req.query?.hospitalId;
   if (hospitalId && req.user.hospitalId && req.user.hospitalId.toString() !== hospitalId.toString()) {
     return res.status(403).json({ error: 'Unauthorized: You do not belong to this hospital.' });
   }
@@ -37,3 +39,4 @@ const requireHospitalStaff = (req, res, next) => {
 };
 
 module.exports = { authorize, requireHospitalStaff };
+
