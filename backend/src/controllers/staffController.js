@@ -2,9 +2,11 @@ const crypto = require('crypto');
 const User = require('../models/User');
 const Token = require('../models/Token');
 const Queue = require('../models/Queue');
+const Hospital = require('../models/Hospital');
 const Invitation = require('../models/Invitation');
 const Department = require('../models/Department');
 const { getTodayString } = require('../services/tokenService');
+const { generateTokens } = require('./authController');
 
 const getProfile = async (req, res, next) => {
   try {
@@ -176,6 +178,144 @@ const inviteStaff = async (req, res, next) => {
   }
 };
 
+const findPendingInvitation = async (token) => {
+  const invitation = await Invitation.findOne({ token: String(token) });
+
+  if (!invitation) {
+    return { error: { statusCode: 404, message: 'Invitation not found.' } };
+  }
+
+  if (invitation.status === 'pending' && invitation.expiresAt.getTime() <= Date.now()) {
+    invitation.status = 'expired';
+    await invitation.save();
+  }
+
+  if (invitation.status !== 'pending') {
+    return { error: { statusCode: 410, message: `Invitation is ${invitation.status}.` } };
+  }
+
+  return { invitation };
+};
+
+const getInvitation = async (req, res, next) => {
+  try {
+    const { invitation, error } = await findPendingInvitation(req.params.token);
+    if (error) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+
+    const [hospital, department] = await Promise.all([
+      Hospital.findById(invitation.hospitalId).select('name code'),
+      invitation.departmentId
+        ? Department.findById(invitation.departmentId).select('name code floor roomNumber')
+        : null,
+    ]);
+
+    res.json({
+      status: 'success',
+      data: {
+        email: invitation.email,
+        role: invitation.role,
+        staffRole: invitation.staffRole,
+        hospitalId: invitation.hospitalId,
+        hospitalName: hospital?.name || '',
+        hospitalCode: hospital?.code || '',
+        departmentId: invitation.departmentId,
+        departmentName: department?.name || '',
+        departmentCode: department?.code || '',
+        expiresAt: invitation.expiresAt,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const acceptInvitation = async (req, res, next) => {
+  try {
+    const { name, password } = req.body;
+    const { invitation, error } = await findPendingInvitation(req.params.token);
+
+    if (error) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+
+    const existingUser = await User.findOne({ email: invitation.email }).select('+password');
+    let user;
+    let created = false;
+
+    if (existingUser) {
+      if (existingUser.role === 'admin') {
+        return res.status(409).json({ error: 'This email belongs to a platform administrator.' });
+      }
+
+      if (
+        existingUser.role === 'staff' &&
+        existingUser.hospitalId &&
+        existingUser.hospitalId.toString() !== invitation.hospitalId.toString()
+      ) {
+        return res.status(409).json({ error: 'This account is already associated with another hospital.' });
+      }
+
+      const passwordMatches = await existingUser.comparePassword(password);
+      if (!passwordMatches) {
+        return res.status(401).json({
+          error: 'An account already exists for this email. Enter your existing password.',
+        });
+      }
+
+      user = existingUser;
+      if (name) user.name = name;
+    } else {
+      if (!name) {
+        return res.status(400).json({ error: 'Name is required to create a staff account.' });
+      }
+
+      user = new User({
+        name,
+        email: invitation.email,
+        password,
+        role: 'staff',
+        hospitalId: invitation.hospitalId,
+        departmentId: invitation.departmentId,
+        staffRole: invitation.staffRole,
+        isVerified: true,
+      });
+      created = true;
+    }
+
+    user.role = 'staff';
+    user.hospitalId = invitation.hospitalId;
+    user.departmentId = invitation.departmentId;
+    user.staffRole = invitation.staffRole;
+    user.isVerified = true;
+
+    const tokens = generateTokens(user);
+    user.refreshToken = tokens.refreshToken;
+    await user.save();
+
+    invitation.status = 'accepted';
+    await invitation.save();
+
+    // Any other outstanding invitation for this email/hospital is now stale.
+    await Invitation.updateMany(
+      { email: invitation.email, hospitalId: invitation.hospitalId, status: 'pending', _id: { $ne: invitation._id } },
+      { status: 'revoked' }
+    );
+
+    res.status(created ? 201 : 200).json({
+      status: 'success',
+      data: {
+        token: tokens.token,
+        refreshToken: tokens.refreshToken,
+        user: user.toJSON(),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const revokeInvitation = async (req, res, next) => {
   try {
     const { hospitalId, invitationId } = req.params;
@@ -226,6 +366,8 @@ module.exports = {
   getPatients,
   getHospitalStaff,
   inviteStaff,
+  getInvitation,
+  acceptInvitation,
   revokeInvitation,
   removeStaff,
 };

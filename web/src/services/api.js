@@ -108,6 +108,12 @@ export const departmentAPI = {
   removeDoctor: (hospitalId, departmentId, doctorId) => api.delete(`/hospitals/${hospitalId}/departments/${departmentId}/doctors/${doctorId}`),
 };
 
+// Staff invitation acceptance (public)
+export const invitationAPI = {
+  getInvitation: (token) => api.get(`/staff/invitations/${token}`),
+  acceptInvitation: (token, data) => api.post(`/staff/invitations/${token}/accept`, data),
+};
+
 // Staff Management API
 export const staffManagementAPI = {
   getStaff: (hospitalId) => api.get(`/staff/hospital/${hospitalId}`),

@@ -14,6 +14,7 @@ export default function Staff() {
   const [inviteRole, setInviteRole] = useState('doctor');
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState(null);
+  const [latestInvite, setLatestInvite] = useState(null);
 
   const hospitalId = typeof user?.hospitalId === 'object' ? user.hospitalId._id : user?.hospitalId;
 
@@ -42,19 +43,37 @@ export default function Staff() {
     fetchStaffData();
   }, [fetchStaffData]);
 
+  const buildInviteLink = (token) => `${window.location.origin}/invite/${token}`;
+
+  const copyInviteLink = async (link) => {
+    try {
+      await navigator.clipboard.writeText(link);
+      setFeedback({ type: 'success', text: 'Invite link copied. Share it with the staff member.' });
+    } catch (err) {
+      setFeedback({ type: 'danger', text: `Copy this link manually: ${link}` });
+    }
+  };
+
   const handleInvite = async (e) => {
     e.preventDefault();
     setFeedback(null);
+    setLatestInvite(null);
     setSubmitting(true);
     try {
-      await staffManagementAPI.inviteStaff(hospitalId, {
+      const res = await staffManagementAPI.inviteStaff(hospitalId, {
         email: inviteEmail,
         departmentId: inviteDept || undefined,
         staffRole: inviteRole,
         role: 'staff',
       });
+      const invitation = res.data?.data;
       setShowInviteModal(false);
       setInviteEmail('');
+      setLatestInvite(
+        invitation?.token
+          ? { email: invitation.email || inviteEmail, link: buildInviteLink(invitation.token) }
+          : null
+      );
       setFeedback({ type: 'success', text: `Invitation generated for ${inviteEmail}` });
       await fetchStaffData();
     } catch (err) {
@@ -93,9 +112,32 @@ export default function Staff() {
           color: feedback.type === 'success' ? 'var(--color-success)' : 'var(--color-danger)',
           padding: '12px 16px',
           borderRadius: '8px',
-          marginBottom: '20px',
+          marginBottom: latestInvite ? '12px' : '20px',
         }}>
           {feedback.text}
+        </div>
+      )}
+
+      {latestInvite && (
+        <div className="card" style={{ marginBottom: '20px', padding: '16px' }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-slate-700)', marginBottom: '8px' }}>
+            Invitation link for {latestInvite.email}
+          </div>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <input
+              readOnly
+              value={latestInvite.link}
+              className="form-control"
+              style={{ flex: 1, minWidth: '260px' }}
+              onFocus={(e) => e.target.select()}
+            />
+            <button onClick={() => copyInviteLink(latestInvite.link)} className="btn btn-primary">
+              Copy Link
+            </button>
+          </div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--color-slate-400)', marginTop: '8px' }}>
+            No email service is configured, so share this link directly. It expires in 7 days.
+          </div>
         </div>
       )}
 
@@ -147,6 +189,7 @@ export default function Staff() {
                 <th>Assigned Role</th>
                 <th>Department</th>
                 <th>Expires</th>
+                <th>Invite Link</th>
                 <th>Action</th>
               </tr>
             </thead>
@@ -157,6 +200,15 @@ export default function Staff() {
                   <td><span className="badge badge-called">{inv.staffRole}</span></td>
                   <td>{inv.departmentId?.name || 'All'}</td>
                   <td>{new Date(inv.expiresAt).toLocaleDateString()}</td>
+                  <td>
+                    <button
+                      onClick={() => copyInviteLink(buildInviteLink(inv.token))}
+                      className="btn btn-secondary"
+                      style={{ padding: '4px 10px', fontSize: '0.8rem' }}
+                    >
+                      Copy Link
+                    </button>
+                  </td>
                   <td>
                     <button
                       onClick={() => handleRevoke(inv._id)}

@@ -161,9 +161,11 @@ const logout = async (req, res, next) => {
 };
 
 module.exports = {
+  generateTokens,
   register,
   login,
   getMe,
   refreshAccessToken,
   logout,
 };
+

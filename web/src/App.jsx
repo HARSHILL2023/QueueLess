@@ -9,6 +9,7 @@ import Departments from './pages/Departments'
 import Staff from './pages/Staff'
 import Settings from './pages/Settings'
 import NotFound from './pages/NotFound'
+import AcceptInvitation from './pages/AcceptInvitation'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function AppRoutes() {
@@ -25,6 +26,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} />
+      <Route path="/invite/:token" element={<AcceptInvitation />} />
       
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route path="/dashboard" element={<Dashboard />} />

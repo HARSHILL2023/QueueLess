@@ -3,6 +3,24 @@ const router = express.Router();
 const staffController = require('../controllers/staffController');
 const { authenticate } = require('../middleware/auth');
 const { authorize, requireHospitalStaff } = require('../middleware/roles');
+const validate = require('../middleware/validate');
+const rateLimit = require('../middleware/rateLimiter');
+const { acceptInvitationSchema } = require('../validators/authValidators');
+
+const invitationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  message: 'Too many invitation attempts. Please try again after 15 minutes.',
+});
+
+// Public invitation endpoints (the invitation token is the credential)
+router.get('/invitations/:token', invitationLimiter, staffController.getInvitation);
+router.post(
+  '/invitations/:token/accept',
+  invitationLimiter,
+  validate(acceptInvitationSchema),
+  staffController.acceptInvitation
+);
 
 router.use(authenticate);
 
@@ -23,3 +41,4 @@ router.delete('/hospital/:hospitalId/invite/:invitationId', requireHospitalStaff
 router.delete('/hospital/:hospitalId/:staffId', requireHospitalStaff, staffController.removeStaff);
 
 module.exports = router;
+
