@@ -3,7 +3,7 @@ const router = express.Router();
 const hospitalController = require('../controllers/hospitalController');
 const departmentController = require('../controllers/departmentController');
 const { authenticate } = require('../middleware/auth');
-const { authorize, requireHospitalStaff } = require('../middleware/roles');
+const { authorize, requireHospitalStaff, requireHospitalScope } = require('../middleware/roles');
 const validate = require('../middleware/validate');
 const { createHospitalSchema, createDepartmentSchema } = require('../validators/hospitalValidators');
 
@@ -12,12 +12,12 @@ router.get('/', hospitalController.getHospitals);
 router.get('/:id', hospitalController.getHospitalById);
 
 // Hospital settings
-router.get('/:id/settings', authenticate, requireHospitalStaff, hospitalController.getHospitalSettings);
-router.patch('/:id/settings', authenticate, requireHospitalStaff, hospitalController.updateHospitalSettings);
+router.get('/:id/settings', authenticate, requireHospitalScope('id'), hospitalController.getHospitalSettings);
+router.patch('/:id/settings', authenticate, requireHospitalScope('id'), hospitalController.updateHospitalSettings);
 
 // Hospital CRUD
 router.post('/', authenticate, authorize('admin'), validate(createHospitalSchema), hospitalController.createHospital);
-router.patch('/:id', authenticate, requireHospitalStaff, hospitalController.updateHospital);
+router.patch('/:id', authenticate, requireHospitalScope('id'), hospitalController.updateHospital);
 
 // Department endpoints nested under /hospitals/:hospitalId/departments
 router.get('/:hospitalId/departments', departmentController.getDepartments);
@@ -39,3 +39,4 @@ router.patch('/:hospitalId/departments/:departmentId/doctors/:doctorId', authent
 router.delete('/:hospitalId/departments/:departmentId/doctors/:doctorId', authenticate, requireHospitalStaff, departmentController.removeDoctor);
 
 module.exports = router;
+

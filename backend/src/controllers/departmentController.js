@@ -13,7 +13,10 @@ const getDepartments = async (req, res, next) => {
 
 const getDepartmentById = async (req, res, next) => {
   try {
-    const department = await Department.findById(req.params.id);
+    const department = await Department.findOne({
+      _id: req.params.id,
+      hospitalId: req.params.hospitalId,
+    });
     if (!department) {
       return res.status(404).json({ error: 'Department not found' });
     }
@@ -50,9 +53,9 @@ const createDepartment = async (req, res, next) => {
 
 const updateDepartment = async (req, res, next) => {
   try {
-    const { departmentId } = req.params;
-    const department = await Department.findByIdAndUpdate(
-      departmentId,
+    const { hospitalId, departmentId } = req.params;
+    const department = await Department.findOneAndUpdate(
+      { _id: departmentId, hospitalId },
       { $set: req.body },
       { new: true, runValidators: true }
     );
@@ -69,9 +72,9 @@ const updateDepartment = async (req, res, next) => {
 
 const deleteDepartment = async (req, res, next) => {
   try {
-    const { departmentId } = req.params;
-    const department = await Department.findByIdAndUpdate(
-      departmentId,
+    const { hospitalId, departmentId } = req.params;
+    const department = await Department.findOneAndUpdate(
+      { _id: departmentId, hospitalId },
       { isActive: false },
       { new: true }
     );
@@ -112,8 +115,12 @@ const addDoctor = async (req, res, next) => {
 
 const updateDoctor = async (req, res, next) => {
   try {
-    const { doctorId } = req.params;
-    const doctor = await Doctor.findByIdAndUpdate(doctorId, { $set: req.body }, { new: true });
+    const { hospitalId, departmentId, doctorId } = req.params;
+    const doctor = await Doctor.findOneAndUpdate(
+      { _id: doctorId, hospitalId, departmentId },
+      { $set: req.body },
+      { new: true }
+    );
     if (!doctor) {
       return res.status(404).json({ error: 'Doctor not found' });
     }
@@ -125,8 +132,12 @@ const updateDoctor = async (req, res, next) => {
 
 const removeDoctor = async (req, res, next) => {
   try {
-    const { doctorId } = req.params;
-    const doctor = await Doctor.findByIdAndDelete(doctorId);
+    const { hospitalId, departmentId, doctorId } = req.params;
+    const doctor = await Doctor.findOneAndDelete({
+      _id: doctorId,
+      hospitalId,
+      departmentId,
+    });
     if (!doctor) {
       return res.status(404).json({ error: 'Doctor not found' });
     }
@@ -147,3 +158,4 @@ module.exports = {
   updateDoctor,
   removeDoctor,
 };
+

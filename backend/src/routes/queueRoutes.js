@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const queueController = require('../controllers/queueController');
 const { authenticate } = require('../middleware/auth');
-const { authorize, requireHospitalStaff } = require('../middleware/roles');
+const { requireHospitalStaff, requireTokenAccess } = require('../middleware/roles');
 const validate = require('../middleware/validate');
 const rateLimit = require('../middleware/rateLimiter');
 const { bookTokenSchema, callNextSchema, cancelTokenSchema } = require('../validators/queueValidators');
@@ -16,16 +16,17 @@ const bookingLimiter = rateLimit({
 // Patient endpoints
 router.post('/token', authenticate, bookingLimiter, validate(bookTokenSchema), queueController.bookToken);
 router.get('/token/active', authenticate, queueController.getActiveToken);
-router.get('/token/:id', authenticate, queueController.getTokenById);
+router.get('/token/:id', authenticate, requireTokenAccess, queueController.getTokenById);
 router.delete('/token/:id', authenticate, validate(cancelTokenSchema), queueController.cancelToken);
 router.get('/history', authenticate, queueController.getHistory);
 
 // Staff endpoints
 router.get('/department/:hospitalId/:departmentId', authenticate, requireHospitalStaff, queueController.getDepartmentQueue);
 router.post('/call-next', authenticate, requireHospitalStaff, validate(callNextSchema), queueController.callNext);
-router.patch('/token/:id/serving', authenticate, requireHospitalStaff, queueController.markServing);
-router.patch('/token/:id/completed', authenticate, requireHospitalStaff, queueController.markCompleted);
-router.patch('/token/:id/no-show', authenticate, requireHospitalStaff, queueController.markNoShow);
-router.get('/status/:hospitalId', authenticate, queueController.getQueueStatus);
+router.patch('/token/:id/serving', authenticate, requireHospitalStaff, requireTokenAccess, queueController.markServing);
+router.patch('/token/:id/completed', authenticate, requireHospitalStaff, requireTokenAccess, queueController.markCompleted);
+router.patch('/token/:id/no-show', authenticate, requireHospitalStaff, requireTokenAccess, queueController.markNoShow);
+router.get('/status/:hospitalId', authenticate, requireHospitalStaff, queueController.getQueueStatus);
 
 module.exports = router;
+

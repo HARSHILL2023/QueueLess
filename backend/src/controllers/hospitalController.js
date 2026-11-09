@@ -73,9 +73,18 @@ const createHospital = async (req, res, next) => {
 
 const updateHospital = async (req, res, next) => {
   try {
+    const updates = { ...req.body };
+
+    // Only platform admins may change verification or lifecycle fields.
+    if (req.user.role !== 'admin') {
+      delete updates.code;
+      delete updates.isVerified;
+      delete updates.status;
+    }
+
     const hospital = await Hospital.findByIdAndUpdate(
       req.params.id,
-      { $set: req.body },
+      { $set: updates },
       { new: true, runValidators: true }
     );
 
@@ -125,3 +134,4 @@ module.exports = {
   getHospitalSettings,
   updateHospitalSettings,
 };
+

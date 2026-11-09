@@ -77,11 +77,23 @@ const getPatients = async (req, res, next) => {
     const { hospitalId, departmentId, search, status, date } = req.query;
     const query = {};
 
-    const targetHospital = hospitalId || req.user.hospitalId;
-    if (targetHospital) query.hospitalId = targetHospital;
+    // Staff can only read patients from their own hospital. Platform admins may
+    // query a specific hospital, or all hospitals when none is supplied.
+    if (req.user.role === 'admin') {
+      if (hospitalId) query.hospitalId = hospitalId;
+    } else {
+      if (!req.user.hospitalId) {
+        return res.status(403).json({ error: 'No hospital is assigned to your staff account.' });
+      }
 
-    const targetDept = departmentId || req.user.departmentId;
-    if (targetDept) query.departmentId = targetDept;
+      if (hospitalId && hospitalId.toString() !== req.user.hospitalId.toString()) {
+        return res.status(403).json({ error: 'Unauthorized: You do not belong to this hospital.' });
+      }
+
+      query.hospitalId = req.user.hospitalId;
+    }
+
+    if (departmentId) query.departmentId = departmentId;
 
     query.date = date || getTodayString();
 
@@ -166,8 +178,17 @@ const inviteStaff = async (req, res, next) => {
 
 const revokeInvitation = async (req, res, next) => {
   try {
-    const { invitationId } = req.params;
-    await Invitation.findByIdAndUpdate(invitationId, { status: 'revoked' });
+    const { hospitalId, invitationId } = req.params;
+    const invitation = await Invitation.findOneAndUpdate(
+      { _id: invitationId, hospitalId },
+      { status: 'revoked' },
+      { new: true }
+    );
+
+    if (!invitation) {
+      return res.status(404).json({ error: 'Invitation not found for this hospital.' });
+    }
+
     res.json({ status: 'success', message: 'Invitation revoked' });
   } catch (error) {
     next(error);
@@ -176,13 +197,22 @@ const revokeInvitation = async (req, res, next) => {
 
 const removeStaff = async (req, res, next) => {
   try {
-    const { staffId } = req.params;
-    await User.findByIdAndUpdate(staffId, {
-      hospitalId: null,
-      departmentId: null,
-      role: 'patient',
-      staffRole: null,
-    });
+    const { hospitalId, staffId } = req.params;
+    const staff = await User.findOneAndUpdate(
+      { _id: staffId, hospitalId, role: 'staff' },
+      {
+        hospitalId: null,
+        departmentId: null,
+        role: 'patient',
+        staffRole: null,
+      },
+      { new: true }
+    );
+
+    if (!staff) {
+      return res.status(404).json({ error: 'Staff member not found for this hospital.' });
+    }
+
     res.json({ status: 'success', message: 'Staff member removed from hospital' });
   } catch (error) {
     next(error);
@@ -199,3 +229,4 @@ module.exports = {
   revokeInvitation,
   removeStaff,
 };
+
