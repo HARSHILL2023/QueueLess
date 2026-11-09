@@ -7,6 +7,15 @@ const http = require('http');
 const { Server } = require('socket.io');
 
 const connectDB = require('./config/database');
+const { initSocket } = require('./services/socketService');
+const errorHandler = require('./middleware/errorHandler');
+
+const authRoutes = require('./routes/authRoutes');
+const hospitalRoutes = require('./routes/hospitalRoutes');
+const queueRoutes = require('./routes/queueRoutes');
+const staffRoutes = require('./routes/staffRoutes');
+const userRoutes = require('./routes/userRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -14,57 +23,70 @@ const server = http.createServer(app);
 // Socket.IO setup
 const io = new Server(server, {
   cors: {
-    origin: process.env.SOCKET_CORS_ORIGIN || 'http://localhost:3000',
-    methods: ['GET', 'POST'],
+    origin: '*',
+    methods: ['GET', 'POST', 'PATCH', 'DELETE'],
     credentials: true,
   },
 });
 
-// Make io accessible to routes
+initSocket(io);
+
+// Make io accessible to all controllers
 app.set('io', io);
 
-// Middleware
+// Security & Utility Middlewares
 app.use(helmet());
-app.use(cors({
-  origin: [process.env.CLIENT_URL, process.env.MOBILE_URL].filter(Boolean),
-  credentials: true,
-}));
-app.use(morgan('dev'));
+app.use(
+  cors({
+    origin: '*', // Allow web and mobile clients
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
+if (process.env.NODE_ENV !== 'test') {
+  app.use(morgan('dev'));
+}
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Health check
+// Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    service: 'QueueLess API',
+    timestamp: new Date().toISOString(),
+  });
 });
 
-// API Routes will go here
+// Mount API Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/hospitals', hospitalRoutes);
+app.use('/api/queue', queueRoutes);
+app.use('/api/staff', staffRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/admin', adminRoutes);
+
+// Fallback for undefined routes
 app.use('/api', (req, res) => {
-  res.json({ message: 'QueueLess API - Routes to be implemented' });
+  res.status(404).json({ error: 'Endpoint not found' });
 });
 
-// 404 handler
+// 404 Handler
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-// Global error handler
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(err.status || 500).json({
-    error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message,
-  });
-});
+// Centralized Error Handler
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-// Start server after DB connection
+// Start server function
 const startServer = async () => {
   try {
     await connectDB();
-    
     server.listen(PORT, () => {
-      console.log(`Server running on port ${PORT} in ${process.env.NODE_ENV} mode`);
+      console.log(`QueueLess API server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);
@@ -72,18 +94,8 @@ const startServer = async () => {
   }
 };
 
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (err) => {
-  console.error('Unhandled Rejection:', err);
-  server.close(() => process.exit(1));
-});
-
-// Handle uncaught exceptions
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
-  process.exit(1);
-});
-
-startServer();
+if (process.env.NODE_ENV !== 'test') {
+  startServer();
+}
 
 module.exports = { app, server, io };

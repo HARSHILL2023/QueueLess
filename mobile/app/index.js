@@ -1,3 +1,4 @@
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSelector } from 'react-redux';
@@ -7,27 +8,57 @@ export default function Index() {
   const { isAuthenticated } = useSelector((state) => state.auth);
   const { role } = useSelector((state) => state.user);
 
+  useEffect(() => {
+    if (isAuthenticated) {
+      if (role === 'staff') {
+        router.replace('/(staff)/queue');
+      } else {
+        router.replace('/(patient)/hospitals');
+      }
+    }
+  }, [isAuthenticated, role, router]);
+
+  const handleGetStarted = () => {
+    if (isAuthenticated) {
+      if (role === 'staff') {
+        router.replace('/(staff)/queue');
+      } else {
+        router.replace('/(patient)/hospitals');
+      }
+    } else {
+      router.push('/(auth)/login');
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.content}>
         <View style={styles.badge}>
-          <Text style={styles.badgeText}>Virtual Queue Platform</Text>
+          <Text style={styles.badgeText}>Real-Time Healthcare Platform</Text>
         </View>
 
         <Text style={styles.title}>QueueLess</Text>
         <Text style={styles.subtitle}>
-          Book online virtual tokens for hospitals and clinics. Track your position in real time without standing in lines.
+          Book online virtual tokens for hospital clinics. Track your live queue position remotely and avoid waiting rooms.
         </Text>
 
         <View style={styles.card}>
           <Text style={styles.cardHeader}>System Status</Text>
           <View style={styles.row}>
-            <Text style={styles.rowLabel}>Auth State:</Text>
-            <Text style={styles.rowValue}>{isAuthenticated ? `Logged in (${role})` : 'Not logged in'}</Text>
-          </View>
-          <View style={styles.row}>
             <Text style={styles.rowLabel}>Virtual Tokens:</Text>
             <Text style={styles.rowValue}>Online Only</Text>
+          </View>
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>Token Assignment:</Text>
+            <Text style={styles.rowValue}>Atomic & Safe</Text>
+          </View>
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>Live Tracking:</Text>
+            <Text style={styles.rowValue}>Active</Text>
+          </View>
+          <View style={[styles.row, { borderBottomWidth: 0 }]}>
+            <Text style={styles.rowLabel}>User State:</Text>
+            <Text style={styles.rowValue}>{isAuthenticated ? `Logged in (${role})` : 'Guest'}</Text>
           </View>
         </View>
       </View>
@@ -35,13 +66,23 @@ export default function Index() {
       <View style={styles.footer}>
         <TouchableOpacity
           style={styles.primaryButton}
-          onPress={() => {
-            // Future route navigation
-          }}
+          onPress={handleGetStarted}
           activeOpacity={0.8}
         >
-          <Text style={styles.primaryButtonText}>Get Started</Text>
+          <Text style={styles.primaryButtonText}>
+            {isAuthenticated ? 'Enter Portal &rarr;' : 'Get Started &rarr;'}
+          </Text>
         </TouchableOpacity>
+
+        {!isAuthenticated && (
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={() => router.push('/(auth)/register')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.secondaryButtonText}>Create New Account</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -53,6 +94,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0f172a',
     justifyContent: 'space-between',
     padding: 24,
+    paddingTop: 64,
   },
   content: {
     flex: 1,
@@ -71,11 +113,11 @@ const styles = StyleSheet.create({
   badgeText: {
     color: '#38bdf8',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   title: {
-    fontSize: 36,
-    fontWeight: '800',
+    fontSize: 38,
+    fontWeight: '900',
     color: '#f8fafc',
     marginBottom: 12,
     letterSpacing: -0.5,
@@ -88,13 +130,13 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: '#1e293b',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 14,
+    padding: 18,
     borderWidth: 1,
     borderColor: '#334155',
   },
   cardHeader: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     color: '#e2e8f0',
     marginBottom: 12,
@@ -104,7 +146,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#334155',
   },
@@ -118,17 +160,29 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   footer: {
-    paddingBottom: 16,
+    paddingBottom: 24,
+    gap: 12,
   },
   primaryButton: {
     backgroundColor: '#0284c7',
-    paddingVertical: 14,
-    borderRadius: 10,
+    paddingVertical: 15,
+    borderRadius: 12,
     alignItems: 'center',
   },
   primaryButtonText: {
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '700',
+  },
+  secondaryButton: {
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  secondaryButtonText: {
+    color: '#38bdf8',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

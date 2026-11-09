@@ -85,15 +85,16 @@ export const userAPI = {
 
 // Queue API
 export const queueAPI = {
-  getToken: (hospitalId, departmentId) => api.post('/queue/token', { hospitalId, departmentId }),
+  getToken: (hospitalId, departmentId, notes) => api.post('/queue/token', { hospitalId, departmentId, notes }),
+  getActiveToken: () => api.get('/queue/token/active'),
   getTokenStatus: (tokenId) => api.get(`/queue/token/${tokenId}`),
-  cancelToken: (tokenId) => api.delete(`/queue/token/${tokenId}`),
+  cancelToken: (tokenId, reason) => api.delete(`/queue/token/${tokenId}`, { data: { reason } }),
   getQueueStatus: (hospitalId) => api.get(`/queue/status/${hospitalId}`),
   getHistory: () => api.get('/queue/history'),
   // Staff endpoints
   callNext: (hospitalId, departmentId) => api.post('/queue/call-next', { hospitalId, departmentId }),
   markServing: (tokenId) => api.patch(`/queue/token/${tokenId}/serving`),
-  markCompleted: (tokenId) => api.patch(`/queue/token/${tokenId}/completed`),
+  markCompleted: (tokenId, notes) => api.patch(`/queue/token/${tokenId}/completed`, { notes }),
   markNoShow: (tokenId) => api.patch(`/queue/token/${tokenId}/no-show`),
   getDepartmentQueue: (hospitalId, departmentId) => api.get(`/queue/department/${hospitalId}/${departmentId}`),
 };
@@ -102,6 +103,12 @@ export const queueAPI = {
 export const hospitalAPI = {
   getHospitals: (params) => api.get('/hospitals', { params }),
   getHospital: (id) => api.get(`/hospitals/${id}`),
+  getDepartments: (hospitalId) => api.get(`/hospitals/${hospitalId}/departments`),
+  getDoctors: (hospitalId, departmentId) => api.get(`/hospitals/${hospitalId}/departments/${departmentId}/doctors`),
+};
+
+// Department API alias
+export const departmentAPI = {
   getDepartments: (hospitalId) => api.get(`/hospitals/${hospitalId}/departments`),
   getDoctors: (hospitalId, departmentId) => api.get(`/hospitals/${hospitalId}/departments/${departmentId}/doctors`),
 };
