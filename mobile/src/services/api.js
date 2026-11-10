@@ -1,7 +1,50 @@
 import axios from 'axios';
+import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
+import { store } from '../store';
+import { logout as logoutAction } from '../store/slices/authSlice';
+import { clearUser } from '../store/slices/userSlice';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
+const DEFAULT_API_URL = 'http://localhost:5000/api';
+
+const isLoopbackUrl = (url) =>
+  /\/\/(localhost|127\.0\.0\.1|\[::1\])(?::|\/|$)/i.test(url || '');
+
+// In Expo Go/dev builds the JS runs on the phone, so "localhost" points at the
+// phone itself. Derive the Metro host (the development machine's LAN IP) and
+// use it for the API when no non-loopback URL was configured explicitly.
+const getDevServerHost = () => {
+  const hostUri =
+    Constants.expoConfig?.hostUri ||
+    Constants.expoGoConfig?.debuggerHost ||
+    Constants.manifest2?.extra?.expoClient?.hostUri;
+
+  if (!hostUri || typeof hostUri !== 'string') return null;
+
+  const withoutScheme = hostUri.replace(/^[a-z]+:\/\//i, '');
+  const host = withoutScheme.startsWith('[')
+    ? withoutScheme.slice(1, withoutScheme.indexOf(']'))
+    : withoutScheme.split(':')[0];
+
+  if (!host || host === 'localhost' || host === '127.0.0.1' || host === '::1') {
+    return null;
+  }
+
+  return host;
+};
+
+const resolveApiBaseUrl = () => {
+  const configured = process.env.EXPO_PUBLIC_API_URL;
+  const devHost = getDevServerHost();
+
+  if (devHost && (!configured || isLoopbackUrl(configured))) {
+    return `http://${devHost}:5000/api`;
+  }
+
+  return configured || DEFAULT_API_URL;
+};
+
+export const API_BASE_URL = resolveApiBaseUrl();
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -50,7 +93,10 @@ api.interceptors.response.use(
       } catch (refreshError) {
         await SecureStore.deleteItemAsync('accessToken');
         await SecureStore.deleteItemAsync('refreshToken');
-        // Redirect to login would be handled by auth state
+        // The refresh token is no longer valid, so drop the restored session
+        // instead of leaving the app routing to authenticated screens.
+        store.dispatch(logoutAction());
+        store.dispatch(clearUser());
         return Promise.reject(refreshError);
       }
     }

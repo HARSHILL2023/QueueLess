@@ -5,7 +5,7 @@ import { useDispatch } from 'react-redux';
 import * as SecureStore from 'expo-secure-store';
 import { setCredentials, setError } from '../../src/store/slices/authSlice';
 import { setUser } from '../../src/store/slices/userSlice';
-import { authAPI } from '../../src/services/api';
+import { authAPI, API_BASE_URL } from '../../src/services/api';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -52,7 +52,11 @@ export default function LoginScreen() {
       }
     } catch (err) {
       console.error('Login error:', err);
-      const msg = err.response?.data?.error || 'Unable to log in. Please check your credentials.';
+      const msg =
+        err.response?.data?.error ||
+        (err.response
+          ? 'Unable to log in. Please check your credentials.'
+          : `Cannot reach the QueueLess server at ${API_BASE_URL}. Check your network and make sure the backend is running.`);
       setErrorMsg(msg);
       dispatch(setError(msg));
     } finally {
@@ -60,14 +64,17 @@ export default function LoginScreen() {
     }
   };
 
-  const fillDemoPatient = () => {
-    setEmail('patient@example.com');
-    setPassword('Password123!');
+  const DEMO_ACCOUNTS = {
+    patient: { email: 'patient@example.com', password: 'Password123!' },
+    staff: { email: 'staff@hospital.com', password: 'Password123!' },
   };
 
-  const fillDemoStaff = () => {
-    setEmail('staff@hospital.com');
-    setPassword('Password123!');
+  const loginAsDemo = (role) => {
+    if (loading) return;
+    const demo = DEMO_ACCOUNTS[role];
+    setEmail(demo.email);
+    setPassword(demo.password);
+    handleLogin(demo.email, demo.password);
   };
 
   return (
@@ -136,11 +143,19 @@ export default function LoginScreen() {
         <View style={styles.demoSection}>
           <Text style={styles.demoTitle}>Quick Demo Logins</Text>
           <View style={styles.demoButtonsRow}>
-            <TouchableOpacity style={styles.demoButton} onPress={fillDemoPatient}>
-              <Text style={styles.demoButtonText}>Fill Patient Demo</Text>
+            <TouchableOpacity
+              style={styles.demoButton}
+              onPress={() => loginAsDemo('patient')}
+              disabled={loading}
+            >
+              <Text style={styles.demoButtonText}>Login: Patient Demo</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.demoButton} onPress={fillDemoStaff}>
-              <Text style={styles.demoButtonText}>Fill Staff Demo</Text>
+            <TouchableOpacity
+              style={styles.demoButton}
+              onPress={() => loginAsDemo('staff')}
+              disabled={loading}
+            >
+              <Text style={styles.demoButtonText}>Login: Staff Demo</Text>
             </TouchableOpacity>
           </View>
         </View>

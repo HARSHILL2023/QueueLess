@@ -5,7 +5,7 @@ import { useDispatch } from 'react-redux';
 import * as SecureStore from 'expo-secure-store';
 import { setCredentials, setError } from '../../src/store/slices/authSlice';
 import { setUser } from '../../src/store/slices/userSlice';
-import { authAPI } from '../../src/services/api';
+import { authAPI, API_BASE_URL } from '../../src/services/api';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -35,7 +35,7 @@ export default function RegisterScreen() {
       const res = await authAPI.register({
         name: name.trim(),
         email: email.trim(),
-        phone: phone.trim(),
+        phone: phone.trim() || undefined,
         password,
       });
 
@@ -50,7 +50,11 @@ export default function RegisterScreen() {
       router.replace('/(patient)/hospitals');
     } catch (err) {
       console.error('Registration error:', err);
-      const msg = err.response?.data?.error || 'Registration failed. Please try again.';
+      const msg =
+        err.response?.data?.error ||
+        (err.response
+          ? 'Registration failed. Please try again.'
+          : `Cannot reach the QueueLess server at ${API_BASE_URL}. Check your network and make sure the backend is running.`);
       setErrorMsg(msg);
       dispatch(setError(msg));
     } finally {
@@ -239,3 +243,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
