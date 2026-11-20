@@ -7,6 +7,7 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "seed": "node src/scripts/seed.js",
+"seed:demo-staff": "node src/scripts/seedDemoStaff.js",
     "test": "jest --runInBand",
     "test:watch": "jest --watch"
   },
