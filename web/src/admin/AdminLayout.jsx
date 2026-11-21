@@ -5,6 +5,10 @@ import './admin.css';
 
 const NAV = [
   { to: '/admin', label: 'Platform overview', icon: '📊', end: true },
+  { to: '/admin/hospitals', label: 'Hospitals', icon: '🏥' },
+  { to: '/admin/patients', label: 'Patients', icon: '🧑‍🤝‍🧑' },
+  { to: '/admin/staff', label: 'Hospital staff', icon: '🩺' },
+  { to: '/admin/activity', label: 'Activity log', icon: '🛡️' },
 ];
 
 export default function AdminLayout() {

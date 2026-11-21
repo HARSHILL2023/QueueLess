@@ -14,6 +14,11 @@ import ProtectedRoute from './components/ProtectedRoute'
 import AdminGuard from './admin/AdminGuard'
 import AdminLayout from './admin/AdminLayout'
 import AdminOverview from './admin/AdminOverview'
+import AdminHospitals from './admin/Hospitals'
+import AdminHospitalDetail from './admin/HospitalDetail'
+import AdminPatients from './admin/Patients'
+import AdminStaff from './admin/Staff'
+import AdminActivityLog from './admin/ActivityLog'
 
 function AppRoutes() {
   const { isAuthenticated, user, loading } = useAuth()
@@ -43,6 +48,11 @@ function AppRoutes() {
       {/* Platform-level console — separate layout, admin role only. */}
       <Route element={<AdminGuard><AdminLayout /></AdminGuard>}>
         <Route path="/admin" element={<AdminOverview />} />
+        <Route path="/admin/hospitals" element={<AdminHospitals />} />
+        <Route path="/admin/hospitals/:id" element={<AdminHospitalDetail />} />
+        <Route path="/admin/patients" element={<AdminPatients />} />
+        <Route path="/admin/staff" element={<AdminStaff />} />
+        <Route path="/admin/activity" element={<AdminActivityLog />} />
       </Route>
       
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
