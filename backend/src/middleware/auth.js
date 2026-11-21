@@ -22,6 +22,14 @@ const authenticate = async (req, res, next) => {
       return res.status(401).json({ error: 'User no longer exists.' });
     }
 
+    // Suspended accounts keep a valid token until it expires; revoke access now.
+    if (user.status === 'suspended') {
+      return res.status(403).json({
+        error: 'This account has been suspended. Contact the platform administrator.',
+        code: 'ACCOUNT_SUSPENDED',
+      });
+    }
+
     req.user = user;
     next();
   } catch (error) {

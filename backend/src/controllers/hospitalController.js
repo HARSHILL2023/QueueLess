@@ -1,5 +1,6 @@
 const Hospital = require('../models/Hospital');
 const Department = require('../models/Department');
+const { recordActivity } = require('../services/activityLogger');
 
 const getHospitals = async (req, res, next) => {
   try {
@@ -65,6 +66,15 @@ const createHospital = async (req, res, next) => {
       isVerified: req.user.role === 'admin',
     });
 
+    await recordActivity({
+      actor: req.user,
+      action: 'hospital.created',
+      targetType: 'hospital',
+      targetId: hospital._id,
+      targetLabel: `${hospital.name} (${hospital.code})`,
+      metadata: { city: hospital.address?.city || '', status: hospital.status },
+    });
+
     res.status(201).json({ status: 'success', data: hospital });
   } catch (error) {
     next(error);
@@ -90,6 +100,21 @@ const updateHospital = async (req, res, next) => {
 
     if (!hospital) {
       return res.status(404).json({ error: 'Hospital not found' });
+    }
+
+    // Only platform-level changes are audited; staff edits stay in the hospital.
+    if (req.user.role === 'admin') {
+      const changedFields = Object.keys(updates).filter((field) => field !== 'updatedAt');
+      if (changedFields.length > 0) {
+        await recordActivity({
+          actor: req.user,
+          action: 'hospital.updated',
+          targetType: 'hospital',
+          targetId: hospital._id,
+          targetLabel: `${hospital.name} (${hospital.code})`,
+          metadata: { changedFields, status: hospital.status },
+        });
+      }
     }
 
     res.json({ status: 'success', data: hospital });

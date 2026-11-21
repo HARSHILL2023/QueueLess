@@ -54,6 +54,25 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    // Account lifecycle. Documents created before this field existed have no
+    // value, which is treated as 'active' everywhere.
+    status: {
+      type: String,
+      enum: ['active', 'suspended'],
+      default: 'active',
+    },
+    suspendedReason: {
+      type: String,
+      default: '',
+    },
+    suspendedAt: {
+      type: Date,
+      default: null,
+    },
+    lastLoginAt: {
+      type: Date,
+      default: null,
+    },
     refreshToken: {
       type: String,
       select: false,
@@ -82,6 +101,8 @@ userSchema.methods.toJSON = function () {
   const obj = this.toObject();
   delete obj.password;
   delete obj.refreshToken;
+  // Accounts created before the status field existed are active.
+  if (!obj.status) obj.status = 'active';
   return obj;
 };
 

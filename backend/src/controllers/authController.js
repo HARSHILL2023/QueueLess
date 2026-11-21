@@ -72,8 +72,18 @@ const login = async (req, res, next) => {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
 
+    if (user.status === 'suspended') {
+      return res.status(403).json({
+        error: user.suspendedReason
+          ? `This account has been suspended: ${user.suspendedReason}`
+          : 'This account has been suspended. Contact the platform administrator.',
+        code: 'ACCOUNT_SUSPENDED',
+      });
+    }
+
     const { token, refreshToken } = generateTokens(user);
     user.refreshToken = refreshToken;
+    user.lastLoginAt = new Date();
     await user.save();
 
     // Populate hospital and department if staff
