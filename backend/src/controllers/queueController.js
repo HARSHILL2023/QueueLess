@@ -186,7 +186,9 @@ const markServing = async (req, res, next) => {
 const markCompleted = async (req, res, next) => {
   try {
     const io = req.app.get('io');
-    const { notes } = req.body;
+    // The completion request may legitimately arrive without a body (clients
+    // that PATCH the route without notes), so default to an empty object.
+    const { notes } = req.body || {};
     const token = await markTokenCompleted({ tokenId: req.params.id, notes, io });
     res.json({ status: 'success', data: token });
   } catch (error) {

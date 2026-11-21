@@ -83,7 +83,7 @@ export const queueAPI = {
     api.get(`/queue/department/${hospitalId}/${departmentId}`, { params }),
   callNext: (hospitalId, departmentId) => api.post('/queue/call-next', { hospitalId, departmentId }),
   markServing: (tokenId) => api.patch(`/queue/token/${tokenId}/serving`),
-  markCompleted: (tokenId) => api.patch(`/queue/token/${tokenId}/completed`),
+  markCompleted: (tokenId, notes) => api.patch(`/queue/token/${tokenId}/completed`, { notes }),
   markNoShow: (tokenId) => api.patch(`/queue/token/${tokenId}/no-show`),
   getTokenDetails: (tokenId) => api.get(`/queue/token/${tokenId}`),
   getQueueStatus: (hospitalId) => api.get(`/queue/status/${hospitalId}`),
