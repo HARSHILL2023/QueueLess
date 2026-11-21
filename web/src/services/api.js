@@ -101,6 +101,7 @@ export const departmentAPI = {
   getDepartments: (hospitalId) => api.get(`/hospitals/${hospitalId}/departments`),
   createDepartment: (hospitalId, data) => api.post(`/hospitals/${hospitalId}/departments`, data),
   updateDepartment: (hospitalId, departmentId, data) => api.patch(`/hospitals/${hospitalId}/departments/${departmentId}`, data),
+  getDepartmentImpact: (hospitalId, departmentId) => api.get(`/hospitals/${hospitalId}/departments/${departmentId}/impact`),
   deleteDepartment: (hospitalId, departmentId) => api.delete(`/hospitals/${hospitalId}/departments/${departmentId}`),
   getDoctors: (hospitalId, departmentId) => api.get(`/hospitals/${hospitalId}/departments/${departmentId}/doctors`),
   addDoctor: (hospitalId, departmentId, data) => api.post(`/hospitals/${hospitalId}/departments/${departmentId}/doctors`, data),

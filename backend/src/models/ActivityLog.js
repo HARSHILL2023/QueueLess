@@ -19,7 +19,7 @@ const activityLogSchema = new mongoose.Schema(
     action: { type: String, required: true, index: true },
     targetType: {
       type: String,
-      enum: ['hospital', 'user', 'platform'],
+      enum: ['hospital', 'department', 'user', 'platform'],
       required: true,
       index: true,
     },

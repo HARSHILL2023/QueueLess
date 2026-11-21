@@ -30,6 +30,12 @@ router.post(
   departmentController.createDepartment
 );
 router.patch('/:hospitalId/departments/:departmentId', authenticate, requireHospitalStaff, departmentController.updateDepartment);
+router.get(
+  '/:hospitalId/departments/:departmentId/impact',
+  authenticate,
+  requireHospitalStaff,
+  departmentController.getDepartmentImpact
+);
 router.delete('/:hospitalId/departments/:departmentId', authenticate, requireHospitalStaff, departmentController.deleteDepartment);
 
 // Doctor endpoints nested under department

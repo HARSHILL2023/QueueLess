@@ -48,6 +48,13 @@ const departmentSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    // Set when a department is archived instead of deleted because tokens,
+    // doctors or staff still reference it. Inactive departments keep all of
+    // their historical records and cannot receive new bookings.
+    archivedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
