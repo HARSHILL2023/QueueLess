@@ -11,9 +11,12 @@ import Settings from './pages/Settings'
 import NotFound from './pages/NotFound'
 import AcceptInvitation from './pages/AcceptInvitation'
 import ProtectedRoute from './components/ProtectedRoute'
+import AdminGuard from './admin/AdminGuard'
+import AdminLayout from './admin/AdminLayout'
+import AdminOverview from './admin/AdminOverview'
 
 function AppRoutes() {
-  const { isAuthenticated, loading } = useAuth()
+  const { isAuthenticated, user, loading } = useAuth()
 
   if (loading) {
     return (
@@ -25,8 +28,22 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} />
+      <Route
+        path="/login"
+        element={
+          isAuthenticated ? (
+            <Navigate to={user?.role === 'admin' ? '/admin' : '/dashboard'} replace />
+          ) : (
+            <Login />
+          )
+        }
+      />
       <Route path="/invite/:token" element={<AcceptInvitation />} />
+
+      {/* Platform-level console — separate layout, admin role only. */}
+      <Route element={<AdminGuard><AdminLayout /></AdminGuard>}>
+        <Route path="/admin" element={<AdminOverview />} />
+      </Route>
       
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route path="/dashboard" element={<Dashboard />} />
@@ -37,7 +54,10 @@ function AppRoutes() {
         <Route path="/settings" element={<Settings />} />
       </Route>
 
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route
+        path="/"
+        element={<Navigate to={user?.role === 'admin' ? '/admin' : '/dashboard'} replace />}
+      />
       <Route path="*" element={<NotFound />} />
     </Routes>
   )
