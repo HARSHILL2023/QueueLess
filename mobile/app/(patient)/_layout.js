@@ -1,21 +1,20 @@
 import { Stack } from 'expo-router';
+import { colors } from '../../src/theme';
 
 export default function PatientLayout() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: '#0f172a' },
-        headerTintColor: '#38bdf8',
-        headerTitleStyle: { fontWeight: '700', color: '#f8fafc' },
-        contentStyle: { backgroundColor: '#0f172a' },
+        headerShown: false,
+        contentStyle: { backgroundColor: colors.background },
+        animation: 'slide_from_right',
       }}
     >
-      <Stack.Screen name="hospitals" options={{ title: 'Hospitals & Clinics', headerShown: false }} />
-      <Stack.Screen name="hospital/[id]" options={{ title: 'Hospital Details' }} />
-      <Stack.Screen name="active-token" options={{ title: 'Live Token Tracker', headerShown: false }} />
-      <Stack.Screen name="history" options={{ title: 'Booking History' }} />
-      <Stack.Screen name="profile" options={{ title: 'My Profile' }} />
+      <Stack.Screen name="hospitals" />
+      <Stack.Screen name="hospital/[id]" />
+      <Stack.Screen name="active-token" options={{ animation: 'fade' }} />
+      <Stack.Screen name="history" />
+      <Stack.Screen name="profile" />
     </Stack>
   );
 }
-

@@ -1,29 +1,67 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  FlatList,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSelector, useDispatch } from 'react-redux';
 import { hospitalAPI, queueAPI } from '../../src/services/api';
 import { setCurrentToken } from '../../src/store/slices/queueSlice';
+import Screen from '../../src/components/Screen';
+import Card from '../../src/components/Card';
+import Button from '../../src/components/Button';
+import Field from '../../src/components/Field';
+import SectionHeading from '../../src/components/SectionHeading';
+import StatusPill from '../../src/components/StatusPill';
+import PulseDot from '../../src/components/PulseDot';
+import FadeIn from '../../src/components/FadeIn';
+import { EmptyState, ErrorState, LoadingState } from '../../src/components/States';
+import { colors, layout, radius, spacing, type } from '../../src/theme';
 
-export default function HospitalsScreen() {
+const greetingForHour = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+};
+
+const formatVisitDate = (value) => {
+  if (!value) return 'Previous visit';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'Previous visit';
+  return `Visited ${parsed.toLocaleDateString([], { day: 'numeric', month: 'short' })}`;
+};
+
+export default function PatientHomeScreen() {
   const router = useRouter();
   const dispatch = useDispatch();
   const { profile } = useSelector((state) => state.user);
   const { currentToken } = useSelector((state) => state.queue);
 
   const [hospitals, setHospitals] = useState([]);
+  const [history, setHistory] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
 
   const fetchHospitals = useCallback(async () => {
+    setError('');
     try {
-      const [hospRes, activeRes] = await Promise.all([
+      const [hospRes, activeRes, historyRes] = await Promise.all([
         hospitalAPI.getHospitals({ search: search || undefined, verifiedOnly: 'true' }),
         queueAPI.getActiveToken().catch(() => ({ data: { data: null } })),
+        queueAPI.getHistory().catch(() => ({ data: { data: [] } })),
       ]);
 
       setHospitals(hospRes.data?.data || []);
+      setHistory(historyRes.data?.data || []);
+
       if (activeRes.data?.data) {
         dispatch(setCurrentToken(activeRes.data.data));
       } else {
@@ -31,6 +69,11 @@ export default function HospitalsScreen() {
       }
     } catch (err) {
       console.error('Error fetching hospitals:', err);
+      setError(
+        err.response
+          ? 'We could not reach the hospital directory. Please try again.'
+          : 'No connection to QueueLess. Check your network and try again.'
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -46,317 +89,431 @@ export default function HospitalsScreen() {
     fetchHospitals();
   };
 
-  const renderHospitalCard = ({ item }) => (
-    <TouchableOpacity
-      style={styles.card}
-      activeOpacity={0.8}
-      onPress={() => router.push(`/(patient)/hospital/${item._id}`)}
-    >
-      <View style={styles.cardHeader}>
-        <View style={styles.hospitalTitleBlock}>
-          <Text style={styles.hospitalName}>{item.name}</Text>
-          <Text style={styles.hospitalLocation}>
-            📍 {item.address?.city}, {item.address?.state}
+  const recentHospitals = useMemo(() => {
+    const seen = new Map();
+    history.forEach((item) => {
+      const hospital = item.hospitalId;
+      if (hospital?._id && !seen.has(hospital._id)) {
+        seen.set(hospital._id, {
+          ...hospital,
+          lastVisit: item.completedAt || item.createdAt || item.date,
+        });
+      }
+    });
+    return Array.from(seen.values()).slice(0, 6);
+  }, [history]);
+
+  const firstName = profile?.name ? String(profile.name).split(' ')[0] : 'there';
+  const activeTokenNumber =
+    currentToken?.token?.tokenDisplay || currentToken?.tokenDisplay || null;
+
+  const openHospital = (hospitalId) => router.push(`/(patient)/hospital/${hospitalId}`);
+
+  const renderHospital = ({ item, index }) => (
+    <FadeIn delay={Math.min(index, 6) * 45} distance={10}>
+      <Pressable
+        onPress={() => openHospital(item._id)}
+        accessibilityRole="button"
+        accessibilityLabel={`View clinics at ${item.name}`}
+        style={({ pressed }) => [pressed && styles.pressedCard]}
+      >
+        <Card tone="surface" elevated style={styles.hospitalCard}>
+          <View style={styles.cardTopRow}>
+            <Text style={styles.hospitalName} numberOfLines={2}>
+              {item.name}
+            </Text>
+            {item.code ? <StatusPill label={item.code} tone="neutral" /> : null}
+          </View>
+
+          <Text style={styles.hospitalMeta}>
+            {[item.address?.city, item.address?.state].filter(Boolean).join(', ') ||
+              'Location available on request'}
           </Text>
-        </View>
-        <View style={styles.codeBadge}>
-          <Text style={styles.codeBadgeText}>{item.code}</Text>
-        </View>
-      </View>
 
-      <Text style={styles.hospitalDesc} numberOfLines={2}>
-        {item.description || 'Verified healthcare center offering online virtual queue booking.'}
-      </Text>
+          <Text style={styles.hospitalDesc} numberOfLines={2}>
+            {item.description || 'Verified healthcare centre offering online virtual queue booking.'}
+          </Text>
 
-      <View style={styles.cardFooter}>
-        <View style={styles.verifiedTag}>
-          <Text style={styles.verifiedText}>✓ Verified Facility</Text>
+          <View style={styles.cardDivider} />
+
+          <View style={styles.cardFooterRow}>
+            <View style={styles.cardFooterBlock}>
+              <Text style={styles.cardFooterLabel}>Outpatient hours</Text>
+              <Text style={styles.cardFooterValue}>
+                {item.settings?.openTime || '08:00'} – {item.settings?.closeTime || '20:00'}
+              </Text>
+            </View>
+            <Text style={styles.inlineAction}>View clinics</Text>
+          </View>
+        </Card>
+      </Pressable>
+    </FadeIn>
+  );
+
+  const header = (
+    <View style={styles.headerBlock}>
+      <FadeIn>
+        <View style={styles.brandRow}>
+          <Text style={type.eyebrow}>QueueLess</Text>
+          <View style={styles.headerActions}>
+            <Pressable
+              onPress={() => router.push('/(patient)/history')}
+              accessibilityRole="button"
+              hitSlop={8}
+              style={({ pressed }) => [styles.textAction, pressed && styles.pressedText]}
+            >
+              <Text style={styles.textActionLabel}>Activity</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => router.push('/(patient)/profile')}
+              accessibilityRole="button"
+              hitSlop={8}
+              style={({ pressed }) => [styles.textAction, pressed && styles.pressedText]}
+            >
+              <Text style={styles.textActionLabel}>Profile</Text>
+            </Pressable>
+          </View>
         </View>
-        <Text style={styles.timingText}>
-          🕒 {item.settings?.openTime || '08:00'} - {item.settings?.closeTime || '20:00'}
+
+        <Text style={styles.greeting}>
+          {greetingForHour()},{'\n'}
+          <Text style={styles.greetingName}>{firstName}</Text>
         </Text>
-      </View>
+        <Text style={styles.greetingSub}>
+          Book a virtual token and arrive only when your turn is close.
+        </Text>
+      </FadeIn>
 
-      <View style={styles.ctaButton}>
-        <Text style={styles.ctaButtonText}>View Departments & Book Token &rarr;</Text>
-      </View>
-    </TouchableOpacity>
+      {activeTokenNumber ? (
+        <FadeIn delay={90}>
+          <Pressable
+            onPress={() => router.push('/(patient)/active-token')}
+            accessibilityRole="button"
+            accessibilityLabel={`Track active token ${activeTokenNumber}`}
+            style={({ pressed }) => [pressed && styles.pressedCard]}
+          >
+            <Card tone="lavender" style={styles.activeCard}>
+              <View style={styles.activeTopRow}>
+                <View style={styles.activeLabelRow}>
+                  <PulseDot />
+                  <Text style={styles.activeLabel}>Live token</Text>
+                </View>
+                <Text style={styles.activeTap}>Track</Text>
+              </View>
+              <Text style={styles.activeNumber}>{activeTokenNumber}</Text>
+              <Text style={styles.activeSub}>
+                Your place in the queue is updating automatically. Open to see people ahead and
+                estimated wait.
+              </Text>
+            </Card>
+          </Pressable>
+        </FadeIn>
+      ) : null}
+
+      <FadeIn delay={activeTokenNumber ? 150 : 100}>
+        <View style={styles.searchBlock}>
+          <Field
+            placeholder="Search hospital or city"
+            value={search}
+            onChangeText={setSearch}
+            returnKeyType="search"
+            autoCapitalize="words"
+            accessibilityLabel="Search hospitals"
+          />
+        </View>
+      </FadeIn>
+
+      {recentHospitals.length > 0 ? (
+        <View style={styles.recentBlock}>
+          <SectionHeading
+            eyebrow="Continue where you left off"
+            title="Recently visited"
+            style={styles.recentHeading}
+          />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.recentList}
+          >
+            {recentHospitals.map((hospital) => (
+              <Pressable
+                key={hospital._id}
+                onPress={() => openHospital(hospital._id)}
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${hospital.name}`}
+                style={({ pressed }) => [styles.recentCard, pressed && styles.pressedCard]}
+              >
+                <Text style={styles.recentName} numberOfLines={2}>
+                  {hospital.name || 'Hospital'}
+                </Text>
+                <Text style={styles.recentCity} numberOfLines={1}>
+                  {[hospital.address?.city, hospital.address?.state].filter(Boolean).join(', ') ||
+                    'Clinic visit'}
+                </Text>
+                <Text style={styles.recentDate}>{formatVisitDate(hospital.lastVisit)}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
+
+      <SectionHeading
+        eyebrow="Verified facilities"
+        title="Hospitals"
+        subtitle={
+          loading || error ? undefined : `${hospitals.length} ${hospitals.length === 1 ? 'hospital' : 'hospitals'} accepting online tokens`
+        }
+        style={styles.listHeading}
+      />
+    </View>
   );
 
   return (
-    <View style={styles.container}>
-      {/* Top Header */}
-      <View style={styles.topBar}>
-        <View>
-          <Text style={styles.greeting}>Hello, {profile?.name ? profile.name.split(' ')[0] : 'Patient'} 👋</Text>
-          <Text style={styles.subgreeting}>Find a hospital to book a virtual token</Text>
-        </View>
-        <View style={styles.navIcons}>
-          <TouchableOpacity
-            style={styles.navButton}
-            onPress={() => router.push('/(patient)/history')}
-          >
-            <Text style={styles.navIconText}>📋</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.navButton}
-            onPress={() => router.push('/(patient)/profile')}
-          >
-            <Text style={styles.navIconText}>👤</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Active Token Banner if any */}
-      {currentToken && (
-        <TouchableOpacity
-          style={styles.activeTokenPill}
-          activeOpacity={0.85}
-          onPress={() => router.push('/(patient)/active-token')}
-        >
-          <View style={styles.pulseDot} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.activeTokenTitle}>
-              You have an active token: <Text style={{ fontWeight: '800' }}>{currentToken.token?.tokenDisplay || currentToken.tokenDisplay}</Text>
-            </Text>
-            <Text style={styles.activeTokenSub}>Tap to track live queue status & wait time &rarr;</Text>
-          </View>
-        </TouchableOpacity>
-      )}
-
-      {/* Search Input */}
-      <View style={styles.searchSection}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search by hospital name or city..."
-          placeholderTextColor="#64748b"
-          value={search}
-          onChangeText={setSearch}
-          returnKeyType="search"
-        />
-      </View>
-
-      {/* Hospital List */}
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#0284c7" />
-          <Text style={styles.loadingText}>Locating verified healthcare centers...</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={hospitals}
-          keyExtractor={(item) => item._id}
-          renderItem={renderHospitalCard}
-          contentContainerStyle={styles.listContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#38bdf8" />}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyEmoji}>🏥</Text>
-              <Text style={styles.emptyTitle}>No Hospitals Found</Text>
-              <Text style={styles.emptyText}>Try searching for another city or hospital name.</Text>
+    <Screen scroll={false} padded={false}>
+      <FlatList
+        data={error ? [] : hospitals}
+        keyExtractor={(item) => item._id}
+        renderItem={renderHospital}
+        ListHeaderComponent={header}
+        contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.lavenderStrong}
+            colors={[colors.lavenderStrong]}
+            progressBackgroundColor={colors.surface}
+          />
+        }
+        ListEmptyComponent={
+          error ? (
+            <ErrorState title="Hospital directory unavailable" message={error} onAction={fetchHospitals} />
+          ) : loading ? (
+            <LoadingState label="Finding verified hospitals" />
+          ) : (
+            <EmptyState
+              eyebrow="Nothing here yet"
+              title="No hospitals found"
+              message={
+                search
+                  ? 'No verified hospital matches that search. Try a different name or city.'
+                  : 'Verified hospitals will appear here as soon as they go live.'
+              }
+              actionLabel={search ? 'Clear search' : undefined}
+              onAction={search ? () => setSearch('') : undefined}
+            />
+          )
+        }
+        ListFooterComponent={
+          !loading && !error && hospitals.length > 0 ? (
+            <View style={styles.listFooter}>
+              <Text style={styles.footerNote}>
+                Tokens are issued online only. Your queue position is held while you travel.
+              </Text>
+              <Button
+                label="My activity"
+                variant="soft"
+                size="sm"
+                onPress={() => router.push('/(patient)/history')}
+              />
             </View>
-          }
-        />
-      )}
-    </View>
+          ) : null
+        }
+      />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0f172a',
-    paddingTop: 56,
+  listContent: {
+    width: '100%',
+    maxWidth: layout.maxContentWidth,
+    alignSelf: 'center',
+    paddingHorizontal: layout.screenPadding,
+    paddingBottom: spacing.xxl,
   },
-  topBar: {
+  headerBlock: {
+    paddingTop: spacing.base,
+  },
+  brandRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 16,
+    justifyContent: 'space-between',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.base,
+  },
+  textAction: {
+    paddingVertical: 2,
+  },
+  textActionLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.inkSoft,
+  },
+  pressedText: {
+    opacity: 0.5,
   },
   greeting: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#f8fafc',
-    letterSpacing: -0.5,
+    ...type.hero,
+    marginTop: spacing.lg,
   },
-  subgreeting: {
-    fontSize: 13,
-    color: '#94a3b8',
-    marginTop: 2,
+  greetingName: {
+    ...type.hero,
+    color: colors.lavenderInk,
   },
-  navIcons: {
-    flexDirection: 'row',
-    gap: 8,
+  greetingSub: {
+    ...type.body,
+    color: colors.muted,
+    marginTop: spacing.sm,
+    maxWidth: 320,
   },
-  navButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#1e293b',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#334155',
+  activeCard: {
+    marginTop: spacing.xl,
+    padding: spacing.lg,
+    paddingBottom: spacing.lg + 2,
+    gap: spacing.sm,
   },
-  navIconText: {
-    fontSize: 18,
-  },
-  activeTokenPill: {
-    marginHorizontal: 20,
-    marginBottom: 16,
-    backgroundColor: 'rgba(2, 132, 199, 0.2)',
-    borderWidth: 1,
-    borderColor: '#38bdf8',
-    borderRadius: 12,
-    padding: 12,
+  activeTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'space-between',
   },
-  pulseDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#38bdf8',
+  activeLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
-  activeTokenTitle: {
-    color: '#38bdf8',
-    fontSize: 13,
-    fontWeight: '600',
+  activeLabel: {
+    ...type.eyebrow,
+    color: colors.lavenderInk,
   },
-  activeTokenSub: {
-    color: '#bae6fd',
-    fontSize: 11,
-    marginTop: 2,
+  activeTap: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.lavenderInk,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
   },
-  searchSection: {
-    paddingHorizontal: 20,
-    marginBottom: 16,
+  activeNumber: {
+    ...type.stat,
+    fontSize: 40,
+    lineHeight: 46,
+    color: colors.lavenderInk,
   },
-  searchInput: {
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
+  activeSub: {
+    ...type.bodySmall,
+    color: colors.lavenderInk,
+    opacity: 0.8,
+  },
+  searchBlock: {
+    marginTop: spacing.xl,
+  },
+  recentBlock: {
+    marginTop: spacing.xl,
+  },
+  recentHeading: {
+    marginBottom: spacing.md,
+  },
+  recentList: {
+    gap: spacing.md,
+    paddingRight: spacing.lg,
+  },
+  recentCard: {
+    width: 172,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    padding: spacing.base,
+    gap: 4,
     borderWidth: 1,
-    borderColor: '#334155',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    color: '#f8fafc',
+    borderColor: colors.line,
+  },
+  recentName: {
+    ...type.subheading,
     fontSize: 14,
   },
-  listContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 32,
-    gap: 16,
+  recentCity: {
+    ...type.caption,
   },
-  card: {
-    backgroundColor: '#1e293b',
-    borderRadius: 16,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: '#334155',
+  recentDate: {
+    ...type.eyebrow,
+    fontSize: 10,
+    letterSpacing: 1,
+    color: colors.faint,
+    marginTop: spacing.sm,
   },
-  cardHeader: {
+  listHeading: {
+    marginTop: spacing.xxl,
+    marginBottom: spacing.md,
+  },
+  hospitalCard: {
+    marginBottom: spacing.base,
+    gap: spacing.sm,
+  },
+  cardTopRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 10,
-  },
-  hospitalTitleBlock: {
-    flex: 1,
-    paddingRight: 12,
+    justifyContent: 'space-between',
+    gap: spacing.md,
   },
   hospitalName: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#f8fafc',
-    marginBottom: 4,
+    ...type.title,
+    fontSize: 21,
+    lineHeight: 27,
+    flex: 1,
   },
-  hospitalLocation: {
-    fontSize: 13,
-    color: '#94a3b8',
-  },
-  codeBadge: {
-    backgroundColor: 'rgba(56, 189, 248, 0.15)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#38bdf8',
-  },
-  codeBadgeText: {
-    color: '#38bdf8',
-    fontSize: 12,
-    fontWeight: '700',
+  hospitalMeta: {
+    ...type.captionStrong,
+    color: colors.muted,
   },
   hospitalDesc: {
-    fontSize: 13,
-    color: '#cbd5e1',
-    lineHeight: 18,
-    marginBottom: 14,
+    ...type.bodySmall,
+    color: colors.inkSoft,
   },
-  cardFooter: {
+  cardDivider: {
+    height: 1,
+    backgroundColor: colors.line,
+    marginVertical: spacing.sm,
+  },
+  cardFooterRow: {
     flexDirection: 'row',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#334155',
-    marginBottom: 12,
   },
-  verifiedTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  cardFooterBlock: {
+    gap: 2,
   },
-  verifiedText: {
-    color: '#4ade80',
-    fontSize: 12,
+  cardFooterLabel: {
+    ...type.eyebrow,
+    fontSize: 10,
+    letterSpacing: 1,
+    color: colors.faint,
+  },
+  cardFooterValue: {
+    ...type.bodySmall,
     fontWeight: '600',
+    color: colors.ink,
   },
-  timingText: {
-    color: '#94a3b8',
-    fontSize: 12,
-  },
-  ctaButton: {
-    backgroundColor: '#0284c7',
-    borderRadius: 10,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  ctaButtonText: {
-    color: '#ffffff',
+  inlineAction: {
     fontSize: 13,
     fontWeight: '700',
+    color: colors.lavenderInk,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  pressedCard: {
+    opacity: 0.9,
+    transform: [{ scale: 0.995 }],
+  },
+  listFooter: {
+    paddingTop: spacing.base,
+    paddingBottom: spacing.xl,
     alignItems: 'center',
-    gap: 12,
+    gap: spacing.base,
   },
-  loadingText: {
-    color: '#94a3b8',
-    fontSize: 14,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 48,
-  },
-  emptyEmoji: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#f8fafc',
-    marginBottom: 6,
-  },
-  emptyText: {
-    fontSize: 13,
-    color: '#94a3b8',
+  footerNote: {
+    ...type.caption,
     textAlign: 'center',
+    maxWidth: 300,
   },
 });
-

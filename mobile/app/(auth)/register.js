@@ -1,11 +1,17 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useDispatch } from 'react-redux';
 import * as SecureStore from 'expo-secure-store';
 import { setCredentials, setError } from '../../src/store/slices/authSlice';
 import { setUser } from '../../src/store/slices/userSlice';
 import { authAPI, API_BASE_URL } from '../../src/services/api';
+import Screen from '../../src/components/Screen';
+import Button from '../../src/components/Button';
+import Field from '../../src/components/Field';
+import Card from '../../src/components/Card';
+import FadeIn from '../../src/components/FadeIn';
+import { colors, spacing, type } from '../../src/theme';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -63,184 +69,140 @@ export default function RegisterScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-      <View style={styles.header}>
-        <Text style={styles.title}>Join QueueLess</Text>
-        <Text style={styles.subtitle}>Book online virtual tokens and skip the hospital waiting lines.</Text>
-      </View>
+    <Screen contentContainerStyle={styles.content}>
+      <FadeIn>
+        <Text style={type.eyebrow}>QueueLess</Text>
+        <Text style={styles.title}>Create your account</Text>
+        <Text style={styles.subtitle}>
+          Book virtual tokens, skip the waiting room, and keep every visit in one place.
+        </Text>
+      </FadeIn>
 
       {errorMsg ? (
-        <View style={styles.errorBanner}>
-          <Text style={styles.errorText}>{errorMsg}</Text>
-        </View>
+        <FadeIn>
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorText}>{errorMsg}</Text>
+          </View>
+        </FadeIn>
       ) : null}
 
-      <View style={styles.form}>
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Full Name</Text>
-          <TextInput
-            style={styles.input}
+      <FadeIn delay={80}>
+        <Card tone="surface" elevated style={styles.form}>
+          <Field
+            label="Full name"
             placeholder="Aarav Sharma"
-            placeholderTextColor="#64748b"
+            autoCapitalize="words"
+            textContentType="name"
             value={name}
             onChangeText={setName}
           />
-        </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Email Address</Text>
-          <TextInput
-            style={styles.input}
+          <Field
+            label="Email address"
             placeholder="aarav@example.com"
-            placeholderTextColor="#64748b"
             keyboardType="email-address"
             autoCapitalize="none"
+            autoCorrect={false}
+            textContentType="emailAddress"
             value={email}
             onChangeText={setEmail}
           />
-        </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Phone Number (Optional)</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="+91 9876543210"
-            placeholderTextColor="#64748b"
+          <Field
+            label="Phone number"
+            hint="Optional — used by the hospital only if they need to reach you."
+            placeholder="+91 98765 43210"
             keyboardType="phone-pad"
+            textContentType="telephoneNumber"
             value={phone}
             onChangeText={setPhone}
           />
-        </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="At least 6 characters"
-            placeholderTextColor="#64748b"
+          <Field
+            label="Password"
+            hint="At least 6 characters."
+            placeholder="Create a password"
             secureTextEntry
+            textContentType="newPassword"
             value={password}
             onChangeText={setPassword}
           />
-        </View>
 
-        <TouchableOpacity
-          style={[styles.button, loading && styles.buttonDisabled]}
-          onPress={handleRegister}
-          disabled={loading}
-          activeOpacity={0.8}
+          <Button
+            label="Create patient account"
+            variant="primary"
+            size="lg"
+            loading={loading}
+            onPress={handleRegister}
+            style={styles.submit}
+          />
+        </Card>
+      </FadeIn>
+
+      <FadeIn delay={140}>
+        <Pressable
+          onPress={() => router.push('/(auth)/login')}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}
         >
-          {loading ? (
-            <ActivityIndicator color="#ffffff" />
-          ) : (
-            <Text style={styles.buttonText}>Create Patient Account</Text>
-          )}
-        </TouchableOpacity>
-
-        <View style={styles.footerLink}>
-          <Text style={styles.footerText}>Already registered? </Text>
-          <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
-            <Text style={styles.linkText}>Sign In</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </ScrollView>
+          <Text style={styles.linkMuted}>Already registered? </Text>
+          <Text style={styles.link}>Sign in</Text>
+        </Pressable>
+      </FadeIn>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    backgroundColor: '#0f172a',
-    paddingHorizontal: 24,
-    paddingVertical: 48,
+  content: {
     justifyContent: 'center',
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 28,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xxxl,
+    gap: spacing.lg,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#f8fafc',
-    marginBottom: 8,
-    letterSpacing: -0.5,
+    ...type.hero,
+    fontSize: 34,
+    lineHeight: 41,
+    marginTop: spacing.md,
   },
   subtitle: {
-    fontSize: 14,
-    color: '#94a3b8',
-    textAlign: 'center',
-    lineHeight: 20,
-    paddingHorizontal: 16,
+    ...type.body,
+    color: colors.muted,
+    marginTop: spacing.sm,
+    maxWidth: 330,
   },
   errorBanner: {
-    backgroundColor: 'rgba(220, 38, 38, 0.2)',
-    borderWidth: 1,
-    borderColor: '#dc2626',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 20,
+    backgroundColor: colors.rose,
+    borderRadius: 18,
+    padding: spacing.base,
   },
   errorText: {
-    color: '#fca5a5',
-    fontSize: 13,
-    textAlign: 'center',
+    ...type.bodySmall,
+    color: colors.roseInk,
   },
   form: {
-    backgroundColor: '#1e293b',
-    borderRadius: 16,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: '#334155',
+    gap: spacing.base,
+    borderRadius: 26,
   },
-  inputGroup: {
-    marginBottom: 16,
+  submit: {
+    marginTop: spacing.sm,
   },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#cbd5e1',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: '#0f172a',
-    borderWidth: 1,
-    borderColor: '#334155',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: '#f8fafc',
-    fontSize: 15,
-  },
-  button: {
-    backgroundColor: '#0284c7',
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  footerLink: {
+  linkRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 20,
+    paddingVertical: spacing.sm,
   },
-  footerText: {
-    color: '#94a3b8',
-    fontSize: 14,
+  linkMuted: {
+    ...type.bodySmall,
+    color: colors.muted,
   },
-  linkText: {
-    color: '#38bdf8',
-    fontSize: 14,
-    fontWeight: '600',
+  link: {
+    ...type.bodySmall,
+    fontWeight: '700',
+    color: colors.lavenderInk,
+  },
+  pressed: {
+    opacity: 0.6,
   },
 });
-

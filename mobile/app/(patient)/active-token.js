@@ -1,9 +1,43 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, RefreshControl } from 'react-native';
+import { Alert, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useDispatch } from 'react-redux';
 import { queueAPI } from '../../src/services/api';
 import { clearCurrentToken, setCurrentToken } from '../../src/store/slices/queueSlice';
+import Screen from '../../src/components/Screen';
+import ScreenHeader from '../../src/components/ScreenHeader';
+import Card from '../../src/components/Card';
+import Button from '../../src/components/Button';
+import StatusPill, { labelForStatus } from '../../src/components/StatusPill';
+import PulseDot from '../../src/components/PulseDot';
+import FadeIn from '../../src/components/FadeIn';
+import { EmptyState, LoadingState } from '../../src/components/States';
+import { colors, radius, spacing, type } from '../../src/theme';
+
+const statusNarrative = (status) => {
+  switch (status) {
+    case 'called':
+      return {
+        title: 'Your token has been called',
+        body: 'Please proceed to the clinic now. Show this token number at the desk.',
+      };
+    case 'serving':
+      return {
+        title: 'You are in consultation',
+        body: 'The doctor is attending to you right now.',
+      };
+    case 'completed':
+      return {
+        title: 'Consultation completed',
+        body: 'This visit is closed. Your record is saved in Activity.',
+      };
+    default:
+      return {
+        title: 'Live tracking is on',
+        body: 'Your position updates automatically as the queue moves.',
+      };
+  }
+};
 
 export default function ActiveTokenScreen() {
   const router = useRouter();
@@ -46,19 +80,19 @@ export default function ActiveTokenScreen() {
     if (!tokenId) return;
 
     Alert.alert(
-      'Cancel Virtual Token?',
+      'Cancel virtual token?',
       'Are you sure you want to surrender your spot in the queue? This cannot be undone.',
       [
-        { text: 'Keep Spot', style: 'cancel' },
+        { text: 'Keep spot', style: 'cancel' },
         {
-          text: 'Yes, Cancel Token',
+          text: 'Yes, cancel token',
           style: 'destructive',
           onPress: async () => {
             setCancelling(true);
             try {
               await queueAPI.cancelToken(tokenId, 'Cancelled by patient');
               dispatch(clearCurrentToken());
-              Alert.alert('Token Cancelled', 'Your virtual token has been cancelled.');
+              Alert.alert('Token cancelled', 'Your virtual token has been cancelled.');
               router.replace('/(patient)/hospitals');
             } catch (err) {
               Alert.alert('Error', err.response?.data?.error || 'Failed to cancel token.');
@@ -73,403 +107,290 @@ export default function ActiveTokenScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#0284c7" />
-        <Text style={styles.loadingText}>Syncing live queue position...</Text>
-      </View>
+      <Screen>
+        <ScreenHeader title="Live token" onBack={() => router.back()} />
+        <LoadingState label="Syncing live queue position" />
+      </Screen>
     );
   }
 
   if (!tokenData || !tokenData.token) {
     return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyEmoji}>🎫</Text>
-        <Text style={styles.emptyTitle}>No Active Token Found</Text>
-        <Text style={styles.emptyText}>
-          You do not have any active virtual queue tokens today.
-        </Text>
-        <TouchableOpacity
-          style={styles.browseButton}
-          onPress={() => router.replace('/(patient)/hospitals')}
-        >
-          <Text style={styles.browseButtonText}>Browse Hospitals & Clinics</Text>
-        </TouchableOpacity>
-      </View>
+      <Screen>
+        <ScreenHeader
+          title="Live token"
+          subtitle="Your position in the queue, updated automatically"
+          onBack={() => router.back()}
+        />
+        <EmptyState
+          eyebrow="No active token"
+          title="You are not in a queue"
+          message="You do not have any active virtual queue tokens today."
+          actionLabel="Browse hospitals"
+          onAction={() => router.replace('/(patient)/hospitals')}
+        />
+      </Screen>
     );
   }
 
   const { token, positionInQueue, estimatedWaitMinutes } = tokenData;
   const isCalled = token.status === 'called';
   const isServing = token.status === 'serving';
+  const narrative = statusNarrative(token.status);
+  const peopleAhead = positionInQueue > 1 ? positionInQueue - 1 : 0;
+  const positionLabel = isServing ? 'Now' : isCalled ? 'Called' : `#${positionInQueue || 1}`;
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.container}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchActiveToken(); }} tintColor="#38bdf8" />}
+    <Screen
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => {
+            setRefreshing(true);
+            fetchActiveToken();
+          }}
+          tintColor={colors.lavenderStrong}
+          colors={[colors.lavenderStrong]}
+          progressBackgroundColor={colors.surface}
+        />
+      }
     >
-      {/* Status Alert Banner */}
-      {isCalled ? (
-        <View style={styles.calledBanner}>
-          <Text style={styles.calledBannerEmoji}>🔔</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.calledBannerTitle}>YOUR TOKEN HAS BEEN CALLED!</Text>
-            <Text style={styles.calledBannerSub}>
-              Please proceed immediately to {token.departmentId?.floor || 'Clinic'}, Room {token.departmentId?.roomNumber || '101'}.
+      <ScreenHeader
+        title="Live token"
+        subtitle="Your position in the queue, updated automatically"
+        onBack={() => router.replace('/(patient)/hospitals')}
+        rightLabel="Activity"
+        onRight={() => router.push('/(patient)/history')}
+      />
+
+      <FadeIn>
+        <Card tone="lavender" style={styles.tokenCard}>
+          <View style={styles.tokenTopRow}>
+            <View style={styles.liveRow}>
+              <PulseDot color={isCalled ? colors.peachInk : colors.lavenderInk} />
+              <Text style={styles.tokenEyebrow}>{labelForStatus(token.status)}</Text>
+            </View>
+            <StatusPill label="Live" tone={isCalled ? 'warning' : 'accent'} />
+          </View>
+
+          <Text style={styles.tokenNumber}>{token.tokenDisplay}</Text>
+          <Text style={styles.tokenClinic}>
+            {token.departmentId?.name || 'Clinic'}
+            {token.departmentId?.code ? ` · ${token.departmentId.code}` : ''}
+          </Text>
+          <Text style={styles.tokenHospital}>{token.hospitalId?.name || 'Healthcare facility'}</Text>
+        </Card>
+      </FadeIn>
+
+      <FadeIn delay={80}>
+        <View style={styles.statusBlock}>
+          <Text style={styles.statusTitle}>{narrative.title}</Text>
+          <Text style={styles.statusBody}>{narrative.body}</Text>
+          {isCalled ? (
+            <Text style={styles.statusLocation}>
+              {token.departmentId?.floor || 'Clinic'},{' '}
+              {token.departmentId?.roomNumber
+                ? `Room ${token.departmentId.roomNumber}`
+                : 'report at the reception desk'}
             </Text>
-          </View>
+          ) : null}
         </View>
-      ) : isServing ? (
-        <View style={styles.servingBanner}>
-          <Text style={styles.calledBannerEmoji}>🩺</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.servingBannerTitle}>Currently in Consultation</Text>
-            <Text style={styles.calledBannerSub}>Doctor is attending to your consultation now.</Text>
-          </View>
+      </FadeIn>
+
+      <FadeIn delay={140}>
+        <View style={styles.metricsRow}>
+          <Card tone="surface" elevated style={styles.metricCard}>
+            <Text style={styles.metricLabel}>People ahead</Text>
+            <Text style={styles.metricValue}>{isServing ? '0' : peopleAhead}</Text>
+            <Text style={styles.metricFoot}>
+              {positionLabel === 'Called' ? 'You were called' : 'In this clinic'}
+            </Text>
+          </Card>
+
+          <Card tone="surface" elevated style={styles.metricCard}>
+            <Text style={styles.metricLabel}>Estimated wait</Text>
+            <Text style={styles.metricValue}>{isServing ? '0' : estimatedWaitMinutes || 0}</Text>
+            <Text style={styles.metricFoot}>Minutes remaining</Text>
+          </Card>
+
+          <Card tone="surface" elevated style={styles.metricCard}>
+            <Text style={styles.metricLabel}>Position</Text>
+            <Text style={styles.metricValue}>{positionLabel}</Text>
+            <Text style={styles.metricFoot}>Today’s queue</Text>
+          </Card>
         </View>
-      ) : (
-        <View style={styles.waitingBanner}>
-          <Text style={styles.waitingBannerText}>
-            ⏱ Live Tracking Active: Position automatically updates as the line advances.
+      </FadeIn>
+
+      <FadeIn delay={200}>
+        <Card tone="surface" style={styles.detailsCard}>
+          <Text style={type.eyebrow}>Visit details</Text>
+          <View style={styles.detailsList}>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Floor</Text>
+              <Text style={styles.detailValue}>{token.departmentId?.floor || 'Ground floor'}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Consultation room</Text>
+              <Text style={styles.detailValue}>
+                Room {token.departmentId?.roomNumber || '101'}
+              </Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Patient</Text>
+              <Text style={styles.detailValue}>{token.patientName}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Issued</Text>
+              <Text style={styles.detailValue}>{token.date}</Text>
+            </View>
+          </View>
+        </Card>
+      </FadeIn>
+
+      <FadeIn delay={240}>
+        <View style={styles.actions}>
+          {!isServing ? (
+            <Button
+              label="Cancel my spot"
+              variant="danger"
+              loading={cancelling}
+              onPress={handleCancelToken}
+            />
+          ) : null}
+          <Button
+            label="Back to hospitals"
+            variant="outline"
+            onPress={() => router.replace('/(patient)/hospitals')}
+          />
+          <Text style={styles.refreshNote}>
+            This screen refreshes every 10 seconds. Pull down to refresh immediately.
           </Text>
         </View>
-      )}
-
-      {/* Main Big Token Card */}
-      <View style={styles.tokenCard}>
-        <View style={styles.tokenHeader}>
-          <Text style={styles.hospitalHeaderName}>{token.hospitalId?.name || 'Healthcare Facility'}</Text>
-          <View style={[styles.statusBadge, isCalled && styles.statusBadgeCalled, isServing && styles.statusBadgeServing]}>
-            <Text style={styles.statusBadgeText}>{token.status.toUpperCase()}</Text>
-          </View>
-        </View>
-
-        <View style={styles.tokenDisplayWrapper}>
-          <Text style={styles.tokenLabel}>YOUR VIRTUAL TOKEN</Text>
-          <Text style={styles.tokenDisplay}>{token.tokenDisplay}</Text>
-          <Text style={styles.deptSub}>{token.departmentId?.name || 'Clinic'} ({token.departmentId?.code || 'GEN'})</Text>
-        </View>
-
-        {/* Live Metrics Grid */}
-        <View style={styles.metricsGrid}>
-          <View style={styles.metricCard}>
-            <Text style={styles.metricLabel}>Queue Position</Text>
-            <Text style={styles.metricNumber}>
-              {isServing ? 'NOW' : isCalled ? 'CALLED' : `#${positionInQueue || 1}`}
-            </Text>
-            <Text style={styles.metricSub}>
-              {positionInQueue > 1 ? `${positionInQueue - 1} patients ahead` : 'You are next!'}
-            </Text>
-          </View>
-
-          <View style={styles.metricCard}>
-            <Text style={styles.metricLabel}>Est. Wait Time</Text>
-            <Text style={styles.metricNumber}>
-              {isServing ? '0' : `${estimatedWaitMinutes || 0}`}
-            </Text>
-            <Text style={styles.metricSub}>Minutes remaining</Text>
-          </View>
-        </View>
-
-        {/* Clinic & Room Details */}
-        <View style={styles.detailsBlock}>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Floor / Location:</Text>
-            <Text style={styles.detailValue}>{token.departmentId?.floor || 'Ground Floor'}</Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Consultation Room:</Text>
-            <Text style={styles.detailValue}>Room {token.departmentId?.roomNumber || '101'}</Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Patient Name:</Text>
-            <Text style={styles.detailValue}>{token.patientName}</Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Issued Today:</Text>
-            <Text style={styles.detailValue}>{token.date}</Text>
-          </View>
-        </View>
-
-        {/* Cancel Button */}
-        {!isServing && (
-          <TouchableOpacity
-            style={styles.cancelButton}
-            onPress={handleCancelToken}
-            disabled={cancelling}
-            activeOpacity={0.8}
-          >
-            {cancelling ? (
-              <ActivityIndicator color="#f87171" />
-            ) : (
-              <Text style={styles.cancelButtonText}>Cancel My Spot in Queue</Text>
-            )}
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Back button */}
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => router.replace('/(patient)/hospitals')}
-      >
-        <Text style={styles.backButtonText}>&larr; Back to Hospitals</Text>
-      </TouchableOpacity>
-    </ScrollView>
+      </FadeIn>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 20,
-    backgroundColor: '#0f172a',
-    paddingTop: 56,
-    paddingBottom: 48,
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#0f172a',
-    gap: 12,
-  },
-  loadingText: {
-    color: '#94a3b8',
-    fontSize: 14,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#0f172a',
-    padding: 32,
-  },
-  emptyEmoji: {
-    fontSize: 56,
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#f8fafc',
-    marginBottom: 8,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#94a3b8',
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 24,
-  },
-  browseButton: {
-    backgroundColor: '#0284c7',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 10,
-  },
-  browseButtonText: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  calledBanner: {
-    backgroundColor: 'rgba(217, 119, 6, 0.25)',
-    borderWidth: 2,
-    borderColor: '#f59e0b',
-    borderRadius: 14,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    marginBottom: 20,
-  },
-  calledBannerEmoji: {
-    fontSize: 32,
-  },
-  calledBannerTitle: {
-    color: '#fbbf24',
-    fontSize: 15,
-    fontWeight: '800',
-    marginBottom: 2,
-  },
-  calledBannerSub: {
-    color: '#fef3c7',
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  servingBanner: {
-    backgroundColor: 'rgba(22, 163, 74, 0.2)',
-    borderWidth: 2,
-    borderColor: '#22c55e',
-    borderRadius: 14,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    marginBottom: 20,
-  },
-  servingBannerTitle: {
-    color: '#4ade80',
-    fontSize: 15,
-    fontWeight: '800',
-    marginBottom: 2,
-  },
-  waitingBanner: {
-    backgroundColor: 'rgba(56, 189, 248, 0.1)',
-    borderWidth: 1,
-    borderColor: '#38bdf8',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 20,
-  },
-  waitingBannerText: {
-    color: '#38bdf8',
-    fontSize: 12,
-    textAlign: 'center',
-    fontWeight: '600',
-  },
   tokenCard: {
-    backgroundColor: '#1e293b',
-    borderRadius: 20,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: '#334155',
-    marginBottom: 20,
+    gap: spacing.sm,
+    paddingVertical: spacing.xl,
+    alignItems: 'flex-start',
   },
-  tokenHeader: {
+  tokenTopRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
+    alignSelf: 'stretch',
   },
-  hospitalHeaderName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#94a3b8',
-    flex: 1,
-    marginRight: 10,
-  },
-  statusBadge: {
-    backgroundColor: 'rgba(2, 132, 199, 0.2)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#38bdf8',
-  },
-  statusBadgeCalled: {
-    backgroundColor: 'rgba(217, 119, 6, 0.2)',
-    borderColor: '#f59e0b',
-  },
-  statusBadgeServing: {
-    backgroundColor: 'rgba(22, 163, 74, 0.2)',
-    borderColor: '#22c55e',
-  },
-  statusBadgeText: {
-    color: '#38bdf8',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  tokenDisplayWrapper: {
-    alignItems: 'center',
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#334155',
-    marginBottom: 20,
-  },
-  tokenLabel: {
-    color: '#64748b',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  tokenDisplay: {
-    fontSize: 48,
-    fontWeight: '900',
-    color: '#38bdf8',
-    letterSpacing: 1,
-  },
-  deptSub: {
-    color: '#cbd5e1',
-    fontSize: 14,
-    marginTop: 4,
-    fontWeight: '600',
-  },
-  metricsGrid: {
+  liveRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 20,
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  tokenEyebrow: {
+    ...type.eyebrow,
+    color: colors.lavenderInk,
+  },
+  tokenNumber: {
+    ...type.stat,
+    fontSize: 76,
+    lineHeight: 84,
+    letterSpacing: -1,
+    color: colors.lavenderInk,
+    marginTop: spacing.sm,
+  },
+  tokenClinic: {
+    ...type.heading,
+    color: colors.lavenderInk,
+  },
+  tokenHospital: {
+    ...type.bodySmall,
+    color: colors.lavenderInk,
+    opacity: 0.75,
+  },
+  statusBlock: {
+    marginTop: spacing.xl,
+    gap: spacing.xs,
+  },
+  statusTitle: {
+    ...type.title,
+    fontSize: 22,
+    lineHeight: 28,
+  },
+  statusBody: {
+    ...type.bodySmall,
+    color: colors.muted,
+  },
+  statusLocation: {
+    ...type.captionStrong,
+    color: colors.peachInk,
+    marginTop: spacing.xs,
+  },
+  metricsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.lg,
   },
   metricCard: {
     flex: 1,
-    backgroundColor: '#0f172a',
-    borderRadius: 14,
-    padding: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#334155',
+    padding: spacing.base,
+    gap: 2,
+    borderRadius: radius.md,
   },
   metricLabel: {
-    color: '#94a3b8',
-    fontSize: 12,
-    fontWeight: '600',
-    marginBottom: 4,
+    ...type.eyebrow,
+    fontSize: 9.5,
+    letterSpacing: 1,
+    color: colors.faint,
   },
-  metricNumber: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#f8fafc',
-    marginBottom: 2,
+  metricValue: {
+    ...type.stat,
+    fontSize: 30,
+    lineHeight: 36,
   },
-  metricSub: {
-    color: '#64748b',
+  metricFoot: {
+    ...type.caption,
     fontSize: 11,
+    color: colors.muted,
   },
-  detailsBlock: {
-    backgroundColor: '#0f172a',
-    borderRadius: 12,
-    padding: 16,
+  detailsCard: {
+    marginTop: spacing.base,
+    gap: spacing.md,
     borderWidth: 1,
-    borderColor: '#334155',
-    marginBottom: 20,
-    gap: 8,
+    borderColor: colors.line,
+  },
+  detailsList: {
+    gap: spacing.md,
   },
   detailRow: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
+    gap: spacing.base,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.line,
+    paddingBottom: spacing.md,
   },
   detailLabel: {
-    color: '#64748b',
-    fontSize: 13,
+    ...type.caption,
+    color: colors.muted,
   },
   detailValue: {
-    color: '#cbd5e1',
-    fontSize: 13,
-    fontWeight: '600',
+    ...type.captionStrong,
+    color: colors.ink,
+    flexShrink: 1,
+    textAlign: 'right',
   },
-  cancelButton: {
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#7f1d1d',
-    borderRadius: 10,
-    backgroundColor: 'rgba(127, 29, 29, 0.2)',
+  actions: {
+    marginTop: spacing.xl,
+    gap: spacing.md,
   },
-  cancelButtonText: {
-    color: '#f87171',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  backButton: {
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderRadius: 10,
-    backgroundColor: '#1e293b',
-  },
-  backButtonText: {
-    color: '#94a3b8',
-    fontSize: 14,
-    fontWeight: '600',
+  refreshNote: {
+    ...type.caption,
+    fontSize: 11.5,
+    textAlign: 'center',
+    color: colors.faint,
+    marginTop: spacing.xs,
   },
 });

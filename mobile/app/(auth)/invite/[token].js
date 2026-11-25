@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-  ScrollView,
-} from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useDispatch } from 'react-redux';
 import * as SecureStore from 'expo-secure-store';
 import { setCredentials } from '../../../src/store/slices/authSlice';
 import { setUser } from '../../../src/store/slices/userSlice';
 import { staffAPI } from '../../../src/services/api';
+import Screen from '../../../src/components/Screen';
+import Button from '../../../src/components/Button';
+import Field from '../../../src/components/Field';
+import Card from '../../../src/components/Card';
+import StatusPill from '../../../src/components/StatusPill';
+import FadeIn from '../../../src/components/FadeIn';
+import { ErrorState, LoadingState } from '../../../src/components/States';
+import { colors, spacing, type } from '../../../src/theme';
 
 const roleLabels = {
   doctor: 'Consulting Doctor',
@@ -79,234 +79,161 @@ export default function AcceptInvitationScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#0284c7" />
-        <Text style={styles.loadingText}>Validating invitation…</Text>
-      </View>
+      <Screen contentContainerStyle={styles.centeredContent}>
+        <LoadingState label="Validating invitation" />
+      </Screen>
     );
   }
 
   if (loadError) {
     return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.errorEmoji}>⚠️</Text>
-        <Text style={styles.errorTitle}>Invitation Unavailable</Text>
-        <Text style={styles.errorText}>{loadError}</Text>
-        <TouchableOpacity style={styles.primaryButton} onPress={() => router.replace('/(auth)/login')}>
-          <Text style={styles.primaryButtonText}>Go to Sign In</Text>
-        </TouchableOpacity>
-      </View>
+      <Screen contentContainerStyle={styles.centeredContent}>
+        <ErrorState
+          title="Invitation unavailable"
+          message={loadError}
+          actionLabel="Go to sign in"
+          onAction={() => router.replace('/(auth)/login')}
+        />
+      </Screen>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-      <View style={styles.header}>
-        <Text style={styles.title}>Join QueueLess Staff</Text>
+    <Screen contentContainerStyle={styles.content}>
+      <FadeIn>
+        <Text style={type.eyebrow}>Staff invitation</Text>
+        <Text style={styles.title}>Join your hospital</Text>
         <Text style={styles.subtitle}>
-          Accept your hospital invitation to run the live outpatient queue.
+          Accept the invitation to run the live outpatient queue for your team.
         </Text>
-      </View>
+      </FadeIn>
 
-      <View style={styles.inviteCard}>
-        <Text style={styles.inviteLabel}>INVITATION FOR</Text>
-        <Text style={styles.inviteEmail}>{invitation?.email}</Text>
-        <Text style={styles.inviteHospital}>{invitation?.hospitalName}</Text>
-        <Text style={styles.inviteMeta}>
-          {invitation?.departmentName || 'All departments'} •{' '}
-          {roleLabels[invitation?.staffRole] || invitation?.staffRole}
-        </Text>
-      </View>
+      <FadeIn delay={80}>
+        <Card tone="peachSoft" style={styles.inviteCard}>
+          <StatusPill label="Invitation for" tone="warning" />
+          <Text style={styles.inviteEmail}>{invitation?.email}</Text>
+          <Text style={styles.inviteHospital}>{invitation?.hospitalName}</Text>
+          <Text style={styles.inviteMeta}>
+            {invitation?.departmentName || 'All departments'} ·{' '}
+            {roleLabels[invitation?.staffRole] || invitation?.staffRole}
+          </Text>
+        </Card>
+      </FadeIn>
 
       {formError ? (
-        <View style={styles.errorBanner}>
-          <Text style={styles.errorBannerText}>{formError}</Text>
-        </View>
+        <FadeIn>
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorText}>{formError}</Text>
+          </View>
+        </FadeIn>
       ) : null}
 
-      <View style={styles.form}>
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Full Name</Text>
-          <TextInput
-            style={styles.input}
+      <FadeIn delay={140}>
+        <Card tone="surface" elevated style={styles.form}>
+          <Field
+            label="Full name"
             placeholder="Dr. Your Name"
-            placeholderTextColor="#64748b"
+            hint="Required for new accounts. Leave blank if you already have one."
+            autoCapitalize="words"
             value={name}
             onChangeText={setName}
           />
-          <Text style={styles.hint}>Required for new accounts. Leave blank if you already have one.</Text>
-        </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input}
+          <Field
+            label="Password"
             placeholder={name ? 'Create a password (6+ characters)' : 'Your existing password'}
-            placeholderTextColor="#64748b"
             secureTextEntry
             value={password}
             onChangeText={setPassword}
           />
-        </View>
 
-        <TouchableOpacity
-          style={[styles.primaryButton, submitting && styles.buttonDisabled]}
-          onPress={handleAccept}
-          disabled={submitting}
-          activeOpacity={0.8}
+          <Button
+            label="Accept invitation"
+            variant="primary"
+            size="lg"
+            loading={submitting}
+            onPress={handleAccept}
+            style={styles.submit}
+          />
+        </Card>
+      </FadeIn>
+
+      <FadeIn delay={200}>
+        <Pressable
+          onPress={() => router.replace('/(auth)/login')}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}
         >
-          {submitting ? (
-            <ActivityIndicator color="#ffffff" />
-          ) : (
-            <Text style={styles.primaryButtonText}>Accept Invitation</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+          <Text style={styles.link}>Back to sign in</Text>
+        </Pressable>
+      </FadeIn>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  content: {
+    justifyContent: 'center',
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xxxl,
+    gap: spacing.lg,
+  },
+  centeredContent: {
     flexGrow: 1,
-    backgroundColor: '#0f172a',
-    paddingHorizontal: 24,
-    paddingVertical: 48,
     justifyContent: 'center',
-  },
-  centerContainer: {
-    flex: 1,
-    backgroundColor: '#0f172a',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
-    gap: 12,
-  },
-  loadingText: {
-    color: '#94a3b8',
-    fontSize: 14,
-  },
-  errorEmoji: {
-    fontSize: 48,
-  },
-  errorTitle: {
-    color: '#f8fafc',
-    fontSize: 20,
-    fontWeight: '800',
-  },
-  errorText: {
-    color: '#94a3b8',
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 24,
   },
   title: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: '#f8fafc',
-    marginBottom: 8,
-    textAlign: 'center',
+    ...type.hero,
+    fontSize: 34,
+    lineHeight: 41,
+    marginTop: spacing.md,
   },
   subtitle: {
-    fontSize: 14,
-    color: '#94a3b8',
-    textAlign: 'center',
-    lineHeight: 20,
+    ...type.body,
+    color: colors.muted,
+    marginTop: spacing.sm,
+    maxWidth: 330,
   },
   inviteCard: {
-    backgroundColor: '#1e293b',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#334155',
-    padding: 18,
-    marginBottom: 20,
-  },
-  inviteLabel: {
-    color: '#64748b',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-    marginBottom: 4,
+    gap: spacing.xs,
   },
   inviteEmail: {
-    color: '#38bdf8',
-    fontSize: 16,
-    fontWeight: '700',
+    ...type.subheading,
+    color: colors.peachInk,
+    marginTop: spacing.xs,
   },
   inviteHospital: {
-    color: '#f8fafc',
-    fontSize: 15,
-    fontWeight: '600',
-    marginTop: 8,
+    ...type.heading,
   },
   inviteMeta: {
-    color: '#94a3b8',
-    fontSize: 13,
-    marginTop: 2,
-  },
-  form: {
-    backgroundColor: '#1e293b',
-    borderRadius: 16,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  inputGroup: {
-    marginBottom: 18,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#cbd5e1',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: '#0f172a',
-    borderWidth: 1,
-    borderColor: '#334155',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: '#f8fafc',
-    fontSize: 15,
-  },
-  hint: {
-    color: '#64748b',
-    fontSize: 11,
-    marginTop: 6,
-  },
-  primaryButton: {
-    backgroundColor: '#0284c7',
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 4,
-    paddingHorizontal: 24,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  primaryButtonText: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '700',
+    ...type.caption,
   },
   errorBanner: {
-    backgroundColor: 'rgba(220, 38, 38, 0.2)',
-    borderWidth: 1,
-    borderColor: '#dc2626',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
+    backgroundColor: colors.rose,
+    borderRadius: 18,
+    padding: spacing.base,
   },
-  errorBannerText: {
-    color: '#fca5a5',
-    fontSize: 13,
-    textAlign: 'center',
+  errorText: {
+    ...type.bodySmall,
+    color: colors.roseInk,
+  },
+  form: {
+    gap: spacing.base,
+    borderRadius: 26,
+  },
+  submit: {
+    marginTop: spacing.sm,
+  },
+  linkRow: {
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  link: {
+    ...type.bodySmall,
+    fontWeight: '700',
+    color: colors.lavenderInk,
+  },
+  pressed: {
+    opacity: 0.6,
   },
 });

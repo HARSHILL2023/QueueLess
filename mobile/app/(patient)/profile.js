@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSelector, useDispatch } from 'react-redux';
 import * as SecureStore from 'expo-secure-store';
@@ -7,17 +7,24 @@ import { logout } from '../../src/store/slices/authSlice';
 import { clearUser } from '../../src/store/slices/userSlice';
 import { clearCurrentToken } from '../../src/store/slices/queueSlice';
 import { authAPI } from '../../src/services/api';
+import Screen from '../../src/components/Screen';
+import ScreenHeader from '../../src/components/ScreenHeader';
+import Card from '../../src/components/Card';
+import Button from '../../src/components/Button';
+import StatusPill from '../../src/components/StatusPill';
+import FadeIn from '../../src/components/FadeIn';
+import { colors, spacing, type } from '../../src/theme';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const dispatch = useDispatch();
   const { profile } = useSelector((state) => state.user);
 
-  const handleSignOut = async () => {
-    Alert.alert('Sign Out', 'Are you sure you want to log out of QueueLess?', [
+  const handleSignOut = () => {
+    Alert.alert('Sign out', 'Are you sure you want to log out of QueueLess?', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Sign Out',
+        text: 'Sign out',
         style: 'destructive',
         onPress: async () => {
           try {
@@ -35,131 +42,163 @@ export default function ProfileScreen() {
     ]);
   };
 
+  const displayName = profile?.name || 'Registered patient';
+  const initial = displayName.charAt(0).toUpperCase();
+  const memberSince = profile?.createdAt
+    ? new Date(profile.createdAt).toLocaleDateString([], { month: 'long', year: 'numeric' })
+    : null;
+
+  const rows = [
+    { label: 'Email address', value: profile?.email || 'Not provided' },
+    { label: 'Contact phone', value: profile?.phone || 'Not provided' },
+    { label: 'Account type', value: 'Patient account' },
+    { label: 'Queue notifications', value: 'Enabled' },
+    ...(memberSince ? [{ label: 'Member since', value: memberSince }] : []),
+  ];
+
   return (
-    <View style={styles.container}>
-      <View style={styles.profileCard}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{(profile?.name || 'P').charAt(0).toUpperCase()}</Text>
-        </View>
-        <Text style={styles.name}>{profile?.name || 'Registered Patient'}</Text>
-        <Text style={styles.email}>{profile?.email || 'patient@example.com'}</Text>
-        <View style={styles.roleBadge}>
-          <Text style={styles.roleText}>Verified Patient Account</Text>
-        </View>
-      </View>
+    <Screen>
+      <ScreenHeader
+        onBack={() => router.replace('/(patient)/hospitals')}
+        title="Profile"
+        subtitle="Your details and account settings"
+      />
 
-      <View style={styles.sectionCard}>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Contact Phone</Text>
-          <Text style={styles.infoValue}>{profile?.phone || 'Not provided'}</Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Virtual Tokens</Text>
-          <Text style={styles.infoValue}>Online Only</Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Queue Notification</Text>
-          <Text style={styles.infoValue}>Enabled</Text>
-        </View>
-      </View>
+      <FadeIn>
+        <Card tone="lavenderSoft" style={styles.identityCard}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{initial}</Text>
+          </View>
+          <Text style={styles.name}>{displayName}</Text>
+          <Text style={styles.email}>{profile?.email || 'Not provided'}</Text>
+          <StatusPill label="Verified patient" tone="accent" style={styles.pill} />
+        </Card>
+      </FadeIn>
 
-      <TouchableOpacity style={styles.logoutButton} onPress={handleSignOut} activeOpacity={0.8}>
-        <Text style={styles.logoutText}>Sign Out</Text>
-      </TouchableOpacity>
-    </View>
+      <FadeIn delay={80}>
+        <Card tone="surface" style={styles.detailsCard}>
+          <Text style={type.eyebrow}>Personal information</Text>
+          <View style={styles.rows}>
+            {rows.map((row) => (
+              <View key={row.label} style={styles.row}>
+                <Text style={styles.rowLabel}>{row.label}</Text>
+                <Text style={styles.rowValue}>{row.value}</Text>
+              </View>
+            ))}
+          </View>
+        </Card>
+      </FadeIn>
+
+      <FadeIn delay={140}>
+        <Card tone="surfaceSoft" style={styles.settingsCard}>
+          <Text style={type.eyebrow}>Quick links</Text>
+          <View style={styles.linkRow}>
+            <Button
+              label="My activity"
+              variant="soft"
+              size="sm"
+              full={false}
+              onPress={() => router.push('/(patient)/history')}
+            />
+            <Button
+              label="Live token"
+              variant="outline"
+              size="sm"
+              full={false}
+              onPress={() => router.push('/(patient)/active-token')}
+            />
+          </View>
+        </Card>
+      </FadeIn>
+
+      <FadeIn delay={200}>
+        <View style={styles.actions}>
+          <Button label="Sign out" variant="danger" onPress={handleSignOut} />
+          <Text style={styles.footNote}>
+            You will need to sign in again to book a new virtual token.
+          </Text>
+        </View>
+      </FadeIn>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0f172a',
-    padding: 20,
-  },
-  profileCard: {
-    backgroundColor: '#1e293b',
-    borderRadius: 16,
-    padding: 24,
+  identityCard: {
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#334155',
-    marginBottom: 20,
+    gap: spacing.xs,
+    paddingVertical: spacing.xxl,
   },
   avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#0284c7',
-    justifyContent: 'center',
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: colors.surface,
     alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
   },
   avatarText: {
-    color: '#ffffff',
-    fontSize: 26,
-    fontWeight: '800',
+    ...type.display,
+    fontSize: 32,
+    lineHeight: 38,
+    color: colors.lavenderInk,
   },
   name: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#f8fafc',
-    marginBottom: 4,
+    ...type.title,
+    textAlign: 'center',
   },
   email: {
-    fontSize: 13,
-    color: '#94a3b8',
-    marginBottom: 12,
+    ...type.caption,
   },
-  roleBadge: {
-    backgroundColor: 'rgba(56, 189, 248, 0.15)',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 20,
+  pill: {
+    marginTop: spacing.sm,
+  },
+  detailsCard: {
+    marginTop: spacing.base,
+    gap: spacing.md,
     borderWidth: 1,
-    borderColor: '#38bdf8',
+    borderColor: colors.line,
   },
-  roleText: {
-    color: '#38bdf8',
-    fontSize: 11,
-    fontWeight: '700',
+  rows: {
+    gap: spacing.md,
   },
-  sectionCard: {
-    backgroundColor: '#1e293b',
-    borderRadius: 14,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: '#334155',
-    marginBottom: 32,
-    gap: 14,
-  },
-  infoRow: {
+  row: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#334155',
+    gap: spacing.base,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.line,
+    paddingBottom: spacing.md,
   },
-  infoLabel: {
-    color: '#94a3b8',
-    fontSize: 13,
+  rowLabel: {
+    ...type.caption,
+    color: colors.muted,
   },
-  infoValue: {
-    color: '#f8fafc',
-    fontSize: 13,
-    fontWeight: '600',
+  rowValue: {
+    ...type.captionStrong,
+    color: colors.ink,
+    flexShrink: 1,
+    textAlign: 'right',
   },
-  logoutButton: {
-    backgroundColor: 'rgba(220, 38, 38, 0.15)',
-    borderWidth: 1,
-    borderColor: '#dc2626',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
+  settingsCard: {
+    marginTop: spacing.base,
+    gap: spacing.md,
   },
-  logoutText: {
-    color: '#f87171',
-    fontSize: 15,
-    fontWeight: '700',
+  linkRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+  },
+  actions: {
+    marginTop: spacing.xl,
+    gap: spacing.md,
+  },
+  footNote: {
+    ...type.caption,
+    fontSize: 11.5,
+    textAlign: 'center',
+    color: colors.faint,
   },
 });
-

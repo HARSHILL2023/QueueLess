@@ -1,188 +1,225 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSelector } from 'react-redux';
+import Screen from '../src/components/Screen';
+import Button from '../src/components/Button';
+import Card from '../src/components/Card';
+import StatusPill from '../src/components/StatusPill';
+import PulseDot from '../src/components/PulseDot';
+import FadeIn from '../src/components/FadeIn';
+import { colors, spacing, type } from '../src/theme';
 
-export default function Index() {
+const FEATURES = [
+  {
+    index: '01',
+    title: 'Reserve before you leave',
+    body: 'Pick a hospital and clinic, then receive a virtual token instantly.',
+  },
+  {
+    index: '02',
+    title: 'Follow the live queue',
+    body: 'See people ahead and the estimated wait, refreshed while the line moves.',
+  },
+  {
+    index: '03',
+    title: 'Arrive only when close',
+    body: 'No crowded waiting rooms. Travel when your token number is near.',
+  },
+];
+
+export default function LandingScreen() {
   const router = useRouter();
   const { isAuthenticated } = useSelector((state) => state.auth);
-  const { role } = useSelector((state) => state.user);
+  const { role, profile } = useSelector((state) => state.user);
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      if (role === 'staff') {
-        router.replace('/(staff)/queue');
-      } else {
-        router.replace('/(patient)/hospitals');
-      }
+  const goToPortal = () => {
+    if (role === 'staff') {
+      router.replace('/(staff)/queue');
+    } else {
+      router.replace('/(patient)/hospitals');
     }
-  }, [isAuthenticated, role, router]);
+  };
 
   const handleGetStarted = () => {
     if (isAuthenticated) {
-      if (role === 'staff') {
-        router.replace('/(staff)/queue');
-      } else {
-        router.replace('/(patient)/hospitals');
-      }
+      goToPortal();
     } else {
       router.push('/(auth)/login');
     }
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.content}>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>Real-Time Healthcare Platform</Text>
+    <Screen contentContainerStyle={styles.content}>
+      <FadeIn>
+        <View style={styles.brandRow}>
+          <Text style={type.eyebrow}>QueueLess</Text>
+          {isAuthenticated ? (
+            <View style={styles.liveRow}>
+              <PulseDot />
+              <Text style={styles.signedIn}>
+                {profile?.name ? `${profile.name.split(' ')[0]} · ` : ''}
+                {role}
+              </Text>
+            </View>
+          ) : null}
         </View>
 
-        <Text style={styles.title}>QueueLess</Text>
-        <Text style={styles.subtitle}>
-          Book online virtual tokens for hospital clinics. Track your live queue position remotely and avoid waiting rooms.
+        <Text style={styles.hero}>
+          Healthcare queues,{'\n'}without the waiting room.
         </Text>
+        <Text style={styles.heroBody}>
+          Book a virtual outpatient token, track your position live, and arrive at the clinic only
+          when your turn is close.
+        </Text>
+      </FadeIn>
 
-        <View style={styles.card}>
-          <Text style={styles.cardHeader}>System Status</Text>
-          <View style={styles.row}>
-            <Text style={styles.rowLabel}>Virtual Tokens:</Text>
-            <Text style={styles.rowValue}>Online Only</Text>
+      <FadeIn delay={100} style={styles.features}>
+        {FEATURES.map((feature) => (
+          <View key={feature.index} style={styles.featureRow}>
+            <Text style={styles.featureIndex}>{feature.index}</Text>
+            <View style={styles.featureText}>
+              <Text style={styles.featureTitle}>{feature.title}</Text>
+              <Text style={styles.featureBody}>{feature.body}</Text>
+            </View>
           </View>
-          <View style={styles.row}>
-            <Text style={styles.rowLabel}>Token Assignment:</Text>
-            <Text style={styles.rowValue}>Atomic & Safe</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.rowLabel}>Live Tracking:</Text>
-            <Text style={styles.rowValue}>Active</Text>
-          </View>
-          <View style={[styles.row, { borderBottomWidth: 0 }]}>
-            <Text style={styles.rowLabel}>User State:</Text>
-            <Text style={styles.rowValue}>{isAuthenticated ? `Logged in (${role})` : 'Guest'}</Text>
-          </View>
-        </View>
-      </View>
+        ))}
+      </FadeIn>
 
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={styles.primaryButton}
-          onPress={handleGetStarted}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.primaryButtonText}>
-            {isAuthenticated ? 'Enter Portal &rarr;' : 'Get Started &rarr;'}
+      <FadeIn delay={180}>
+        <Card tone="lavenderSoft" style={styles.noteCard}>
+          <StatusPill label="Online tokens only" tone="accent" />
+          <Text style={styles.noteText}>
+            Tokens are issued through the app. Your place in the queue is held while you travel to
+            the hospital.
           </Text>
-        </TouchableOpacity>
+        </Card>
+      </FadeIn>
 
-        {!isAuthenticated && (
-          <TouchableOpacity
-            style={styles.secondaryButton}
-            onPress={() => router.push('/(auth)/register')}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.secondaryButtonText}>Create New Account</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    </View>
+      <FadeIn delay={240}>
+        <View style={styles.actions}>
+          <Button
+            label={isAuthenticated ? 'Enter QueueLess' : 'Get started'}
+            variant="primary"
+            size="lg"
+            onPress={handleGetStarted}
+          />
+          {!isAuthenticated ? (
+            <>
+              <Button
+                label="Create an account"
+                variant="soft"
+                onPress={() => router.push('/(auth)/register')}
+              />
+              <Pressable
+                onPress={() => router.push('/(auth)/login')}
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}
+              >
+                <Text style={styles.linkMuted}>Already registered? </Text>
+                <Text style={styles.link}>Sign in</Text>
+              </Pressable>
+            </>
+          ) : (
+            <Button label="My activity" variant="soft" onPress={() => router.push('/(patient)/history')} />
+          )}
+        </View>
+      </FadeIn>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0f172a',
-    justifyContent: 'space-between',
-    padding: 24,
-    paddingTop: 64,
-  },
   content: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  badge: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(56, 189, 248, 0.15)',
-    borderColor: '#38bdf8',
-    borderWidth: 1,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    marginBottom: 16,
-  },
-  badgeText: {
-    color: '#38bdf8',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  title: {
-    fontSize: 38,
-    fontWeight: '900',
-    color: '#f8fafc',
-    marginBottom: 12,
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: '#94a3b8',
-    marginBottom: 28,
-  },
-  card: {
-    backgroundColor: '#1e293b',
-    borderRadius: 14,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  cardHeader: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#e2e8f0',
-    marginBottom: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  row: {
-    flexDirection: 'row',
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xxxl,
     justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#334155',
+    gap: spacing.xxl,
   },
-  rowLabel: {
-    color: '#94a3b8',
-    fontSize: 13,
-  },
-  rowValue: {
-    color: '#38bdf8',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  footer: {
-    paddingBottom: 24,
-    gap: 12,
-  },
-  primaryButton: {
-    backgroundColor: '#0284c7',
-    paddingVertical: 15,
-    borderRadius: 12,
+  brandRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xxl,
   },
-  primaryButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
+  liveRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  signedIn: {
+    ...type.eyebrow,
+    fontSize: 10,
+    letterSpacing: 1,
+    color: colors.inkSoft,
+  },
+  hero: {
+    ...type.hero,
+    fontSize: 40,
+    lineHeight: 47,
+  },
+  heroBody: {
+    ...type.body,
+    color: colors.muted,
+    marginTop: spacing.base,
+    maxWidth: 340,
+  },
+  features: {
+    gap: spacing.lg,
+  },
+  featureRow: {
+    flexDirection: 'row',
+    gap: spacing.base,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.line,
+    paddingTop: spacing.lg,
+  },
+  featureIndex: {
+    ...type.eyebrow,
+    fontSize: 10,
+    letterSpacing: 1.2,
+    color: colors.lavenderInk,
+    width: 24,
+    paddingTop: 2,
+  },
+  featureText: {
+    flex: 1,
+    gap: 3,
+  },
+  featureTitle: {
+    ...type.subheading,
+    fontSize: 15.5,
+  },
+  featureBody: {
+    ...type.caption,
+    color: colors.muted,
+  },
+  noteCard: {
+    gap: spacing.sm,
+  },
+  noteText: {
+    ...type.bodySmall,
+    color: colors.lavenderInk,
+    opacity: 0.85,
+  },
+  actions: {
+    gap: spacing.md,
+  },
+  linkRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+  },
+  linkMuted: {
+    ...type.bodySmall,
+    color: colors.muted,
+  },
+  link: {
+    ...type.bodySmall,
     fontWeight: '700',
+    color: colors.lavenderInk,
   },
-  secondaryButton: {
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-  },
-  secondaryButtonText: {
-    color: '#38bdf8',
-    fontSize: 14,
-    fontWeight: '600',
+  pressed: {
+    opacity: 0.6,
   },
 });

@@ -1,183 +1,210 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { queueAPI } from '../../src/services/api';
+import Screen from '../../src/components/Screen';
+import ScreenHeader from '../../src/components/ScreenHeader';
+import Card from '../../src/components/Card';
+import StatusPill, { labelForStatus, toneForStatus } from '../../src/components/StatusPill';
+import FadeIn from '../../src/components/FadeIn';
+import { EmptyState, ErrorState, LoadingState } from '../../src/components/States';
+import { colors, layout, spacing, type } from '../../src/theme';
+
+const formatDate = (value) => {
+  if (!value) return 'Date unavailable';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+const formatTime = (value) => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
 
 export default function HistoryScreen() {
+  const router = useRouter();
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
 
-  const fetchHistory = async () => {
+  const fetchHistory = useCallback(async () => {
+    setError('');
     try {
       const res = await queueAPI.getHistory();
       setHistory(res.data?.data || []);
     } catch (err) {
       console.error('Error fetching history:', err);
+      setError(
+        err.response
+          ? 'We could not load your visit records. Please try again.'
+          : 'No connection to QueueLess. Check your network and try again.'
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchHistory();
-  }, []);
+  }, [fetchHistory]);
 
-  const getStatusStyle = (status) => {
-    switch (status) {
-      case 'completed':
-        return { bg: 'rgba(22, 163, 74, 0.2)', text: '#4ade80' };
-      case 'cancelled':
-        return { bg: 'rgba(220, 38, 38, 0.2)', text: '#f87171' };
-      case 'no-show':
-        return { bg: 'rgba(217, 119, 6, 0.2)', text: '#fbbf24' };
-      default:
-        return { bg: 'rgba(2, 132, 199, 0.2)', text: '#38bdf8' };
-    }
-  };
+  const renderItem = ({ item, index }) => {
+    const completedTime = item.completedAt ? formatTime(item.completedAt) : '';
 
-  const renderItem = ({ item }) => {
-    const statusStyle = getStatusStyle(item.status);
     return (
-      <View style={styles.historyCard}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.tokenDisplay}>{item.tokenDisplay}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
-            <Text style={[styles.statusText, { color: statusStyle.text }]}>
-              {item.status.toUpperCase()}
-            </Text>
+      <FadeIn delay={Math.min(index, 6) * 45} distance={10}>
+        <Card tone="surface" elevated style={styles.card}>
+          <View style={styles.cardTopRow}>
+            <Text style={styles.tokenText}>{item.tokenDisplay}</Text>
+            <StatusPill
+              label={labelForStatus(item.status)}
+              tone={toneForStatus(item.status)}
+            />
           </View>
-        </View>
 
-        <Text style={styles.hospitalText}>{item.hospitalId?.name || 'Hospital'}</Text>
-        <Text style={styles.deptText}>
-          Clinic: {item.departmentId?.name || 'Department'} ({item.departmentId?.code || 'GEN'})
-        </Text>
+          <Text style={styles.hospitalName}>{item.hospitalId?.name || 'Hospital'}</Text>
+          <Text style={styles.clinicName}>
+            {item.departmentId?.name || 'Department'}
+            {item.departmentId?.code ? ` · ${item.departmentId.code}` : ''}
+          </Text>
 
-        <View style={styles.cardFooter}>
-          <Text style={styles.dateText}>Date: {item.date}</Text>
-          {item.completedAt && (
-            <Text style={styles.dateText}>
-              Completed: {new Date(item.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </Text>
-          )}
-        </View>
-      </View>
+          <View style={styles.cardDivider} />
+
+          <View style={styles.cardFooterRow}>
+            <View style={styles.footerBlock}>
+              <Text style={styles.footerLabel}>Visit date</Text>
+              <Text style={styles.footerValue}>{formatDate(item.date)}</Text>
+            </View>
+            {completedTime ? (
+              <View style={[styles.footerBlock, styles.footerRight]}>
+                <Text style={styles.footerLabel}>Completed</Text>
+                <Text style={styles.footerValue}>{completedTime}</Text>
+              </View>
+            ) : null}
+          </View>
+        </Card>
+      </FadeIn>
     );
   };
 
   return (
-    <View style={styles.container}>
-      {loading ? (
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#0284c7" />
-          <Text style={styles.loadingText}>Loading booking records...</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={history}
-          keyExtractor={(item) => item._id}
-          renderItem={renderItem}
-          contentContainerStyle={styles.listContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchHistory(); }} tintColor="#38bdf8" />}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyEmoji}>📋</Text>
-              <Text style={styles.emptyTitle}>No Booking History</Text>
-              <Text style={styles.emptyText}>You haven't completed any queue consultations yet.</Text>
-            </View>
-          }
-        />
-      )}
-    </View>
+    <Screen scroll={false} padded={false}>
+      <FlatList
+        data={error ? [] : history}
+        keyExtractor={(item) => item._id}
+        renderItem={renderItem}
+        contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              fetchHistory();
+            }}
+            tintColor={colors.lavenderStrong}
+            colors={[colors.lavenderStrong]}
+            progressBackgroundColor={colors.surface}
+          />
+        }
+        ListHeaderComponent={
+          <ScreenHeader
+            onBack={() => router.replace('/(patient)/hospitals')}
+            title="Activity"
+            subtitle="Every queue visit and its outcome, in one place"
+          />
+        }
+        ListEmptyComponent={
+          error ? (
+            <ErrorState title="Activity unavailable" message={error} onAction={fetchHistory} />
+          ) : loading ? (
+            <LoadingState label="Loading your visits" />
+          ) : (
+            <EmptyState
+              eyebrow="No records yet"
+              title="No visits so far"
+              message="Once you join a queue, the visit and its outcome will appear here."
+              actionLabel="Browse hospitals"
+              onAction={() => router.replace('/(patient)/hospitals')}
+            />
+          )
+        }
+        ListFooterComponent={
+          !loading && !error && history.length > 0 ? (
+            <Text style={styles.footerNote}>
+              Showing your complete QueueLess visit history.
+            </Text>
+          ) : null
+        }
+      />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0f172a',
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12,
-  },
-  loadingText: {
-    color: '#94a3b8',
-    fontSize: 14,
-  },
   listContent: {
-    padding: 20,
-    gap: 14,
+    width: '100%',
+    maxWidth: layout.maxContentWidth,
+    alignSelf: 'center',
+    paddingHorizontal: layout.screenPadding,
+    paddingBottom: spacing.xxl,
   },
-  historyCard: {
-    backgroundColor: '#1e293b',
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#334155',
+  card: {
+    marginBottom: spacing.base,
+    gap: spacing.xs,
   },
-  cardHeader: {
+  cardTopRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    marginBottom: spacing.xs,
   },
-  tokenDisplay: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#38bdf8',
+  tokenText: {
+    ...type.title,
+    fontSize: 24,
+    lineHeight: 30,
   },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+  hospitalName: {
+    ...type.subheading,
   },
-  statusText: {
-    fontSize: 11,
-    fontWeight: '800',
+  clinicName: {
+    ...type.caption,
   },
-  hospitalText: {
-    fontSize: 15,
+  cardDivider: {
+    height: 1,
+    backgroundColor: colors.line,
+    marginVertical: spacing.md,
+  },
+  cardFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+  },
+  footerBlock: {
+    gap: 2,
+  },
+  footerRight: {
+    alignItems: 'flex-end',
+  },
+  footerLabel: {
+    ...type.eyebrow,
+    fontSize: 10,
+    letterSpacing: 1,
+    color: colors.faint,
+  },
+  footerValue: {
+    ...type.bodySmall,
     fontWeight: '600',
-    color: '#f8fafc',
-    marginBottom: 2,
   },
-  deptText: {
-    fontSize: 13,
-    color: '#cbd5e1',
-    marginBottom: 10,
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    borderTopWidth: 1,
-    borderTopColor: '#334155',
-    paddingTop: 8,
-  },
-  dateText: {
-    fontSize: 12,
-    color: '#94a3b8',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 64,
-  },
-  emptyEmoji: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#f8fafc',
-    marginBottom: 6,
-  },
-  emptyText: {
-    fontSize: 13,
-    color: '#94a3b8',
+  footerNote: {
+    ...type.caption,
+    fontSize: 11.5,
+    textAlign: 'center',
+    color: colors.faint,
+    paddingTop: spacing.base,
   },
 });
-

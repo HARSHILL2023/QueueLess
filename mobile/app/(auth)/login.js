@@ -1,11 +1,17 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useDispatch } from 'react-redux';
 import * as SecureStore from 'expo-secure-store';
 import { setCredentials, setError } from '../../src/store/slices/authSlice';
 import { setUser } from '../../src/store/slices/userSlice';
 import { authAPI, API_BASE_URL } from '../../src/services/api';
+import Screen from '../../src/components/Screen';
+import Button from '../../src/components/Button';
+import Field from '../../src/components/Field';
+import Card from '../../src/components/Card';
+import FadeIn from '../../src/components/FadeIn';
+import { colors, spacing, type } from '../../src/theme';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -78,228 +84,179 @@ export default function LoginScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-      <View style={styles.header}>
-        <View style={styles.iconContainer}>
-          <Text style={styles.icon}>⚡</Text>
-        </View>
-        <Text style={styles.title}>Welcome Back</Text>
-        <Text style={styles.subtitle}>Sign in to access your virtual tokens and healthcare queues.</Text>
-      </View>
+    <Screen contentContainerStyle={styles.content}>
+      <FadeIn>
+        <Text style={type.eyebrow}>QueueLess</Text>
+        <Text style={styles.title}>Welcome back</Text>
+        <Text style={styles.subtitle}>
+          Sign in to pick up your virtual token and follow the live queue.
+        </Text>
+      </FadeIn>
 
       {errorMsg ? (
-        <View style={styles.errorBanner}>
-          <Text style={styles.errorText}>{errorMsg}</Text>
-        </View>
+        <FadeIn>
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorText}>{errorMsg}</Text>
+          </View>
+        </FadeIn>
       ) : null}
 
-      <View style={styles.form}>
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Email Address</Text>
-          <TextInput
-            style={styles.input}
+      <FadeIn delay={80}>
+        <Card tone="surface" elevated style={styles.form}>
+          <Field
+            label="Email address"
             placeholder="patient@example.com"
-            placeholderTextColor="#64748b"
             keyboardType="email-address"
             autoCapitalize="none"
+            autoCorrect={false}
+            textContentType="emailAddress"
             value={email}
             onChangeText={setEmail}
           />
-        </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="••••••••"
-            placeholderTextColor="#64748b"
+          <Field
+            label="Password"
+            placeholder="Your password"
             secureTextEntry
+            textContentType="password"
             value={password}
             onChangeText={setPassword}
           />
-        </View>
 
-        <TouchableOpacity
-          style={[styles.button, loading && styles.buttonDisabled]}
-          onPress={() => handleLogin()}
-          disabled={loading}
-          activeOpacity={0.8}
+          <Button
+            label="Sign in"
+            variant="primary"
+            size="lg"
+            loading={loading}
+            onPress={() => handleLogin()}
+            style={styles.submit}
+          />
+        </Card>
+      </FadeIn>
+
+      <FadeIn delay={140}>
+        <Pressable
+          onPress={() => router.push('/(auth)/register')}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}
         >
-          {loading ? (
-            <ActivityIndicator color="#ffffff" />
-          ) : (
-            <Text style={styles.buttonText}>Sign In</Text>
-          )}
-        </TouchableOpacity>
+          <Text style={styles.linkMuted}>New to QueueLess? </Text>
+          <Text style={styles.link}>Create an account</Text>
+        </Pressable>
+      </FadeIn>
 
-        <View style={styles.footerLink}>
-          <Text style={styles.footerText}>New to QueueLess? </Text>
-          <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
-            <Text style={styles.linkText}>Create an Account</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Demo Helpers for Quick Evaluation */}
+      <FadeIn delay={200}>
         <View style={styles.demoSection}>
-          <Text style={styles.demoTitle}>Quick Demo Logins</Text>
-          <View style={styles.demoButtonsRow}>
-            <TouchableOpacity
-              style={styles.demoButton}
+          <Text style={type.eyebrow}>Quick demo access</Text>
+          <View style={styles.demoRow}>
+            <Pressable
               onPress={() => loginAsDemo('patient')}
               disabled={loading}
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.demoChip, pressed && styles.pressed]}
             >
-              <Text style={styles.demoButtonText}>Login: Patient Demo</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.demoButton}
+              {loading ? (
+                <ActivityIndicator size="small" color={colors.inkSoft} />
+              ) : (
+                <Text style={styles.demoChipText}>Patient demo</Text>
+              )}
+            </Pressable>
+            <Pressable
               onPress={() => loginAsDemo('staff')}
               disabled={loading}
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.demoChip, pressed && styles.pressed]}
             >
-              <Text style={styles.demoButtonText}>Login: Staff Demo</Text>
-            </TouchableOpacity>
+              <Text style={styles.demoChipText}>Staff demo</Text>
+            </Pressable>
           </View>
+          <Text style={styles.demoHint}>For evaluation only. Saved hospital demo credentials.</Text>
         </View>
-      </View>
-    </ScrollView>
+      </FadeIn>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    backgroundColor: '#0f172a',
-    paddingHorizontal: 24,
-    paddingVertical: 48,
+  content: {
     justifyContent: 'center',
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  iconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: 'rgba(2, 132, 199, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#38bdf8',
-  },
-  icon: {
-    fontSize: 28,
+    paddingTop: spacing.xxl,
+    paddingBottom: spacing.xxxl,
+    gap: spacing.lg,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#f8fafc',
-    marginBottom: 8,
-    letterSpacing: -0.5,
+    ...type.hero,
+    fontSize: 36,
+    lineHeight: 43,
+    marginTop: spacing.md,
   },
   subtitle: {
-    fontSize: 14,
-    color: '#94a3b8',
-    textAlign: 'center',
-    lineHeight: 20,
-    paddingHorizontal: 12,
+    ...type.body,
+    color: colors.muted,
+    marginTop: spacing.sm,
+    maxWidth: 320,
   },
   errorBanner: {
-    backgroundColor: 'rgba(220, 38, 38, 0.2)',
-    borderWidth: 1,
-    borderColor: '#dc2626',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 20,
+    backgroundColor: colors.rose,
+    borderRadius: 18,
+    padding: spacing.base,
   },
   errorText: {
-    color: '#fca5a5',
-    fontSize: 13,
-    textAlign: 'center',
+    ...type.bodySmall,
+    color: colors.roseInk,
   },
   form: {
-    backgroundColor: '#1e293b',
-    borderRadius: 16,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: '#334155',
+    gap: spacing.base,
+    borderRadius: 26,
   },
-  inputGroup: {
-    marginBottom: 18,
+  submit: {
+    marginTop: spacing.sm,
   },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#cbd5e1',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: '#0f172a',
-    borderWidth: 1,
-    borderColor: '#334155',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: '#f8fafc',
-    fontSize: 15,
-  },
-  button: {
-    backgroundColor: '#0284c7',
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  footerLink: {
+  linkRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 20,
+    paddingVertical: spacing.sm,
   },
-  footerText: {
-    color: '#94a3b8',
-    fontSize: 14,
+  linkMuted: {
+    ...type.bodySmall,
+    color: colors.muted,
   },
-  linkText: {
-    color: '#38bdf8',
-    fontSize: 14,
-    fontWeight: '600',
+  link: {
+    ...type.bodySmall,
+    fontWeight: '700',
+    color: colors.lavenderInk,
   },
   demoSection: {
-    marginTop: 24,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#334155',
-    alignItems: 'center',
+    gap: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.line,
+    paddingTop: spacing.lg,
   },
-  demoTitle: {
-    fontSize: 12,
-    color: '#64748b',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 10,
-    fontWeight: '700',
-  },
-  demoButtonsRow: {
+  demoRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: spacing.md,
   },
-  demoButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
-    backgroundColor: '#334155',
+  demoChip: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 999,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
   },
-  demoButtonText: {
-    color: '#38bdf8',
-    fontSize: 12,
+  demoChipText: {
+    fontSize: 13,
     fontWeight: '600',
+    color: colors.inkSoft,
+  },
+  demoHint: {
+    ...type.caption,
+    fontSize: 11.5,
+    color: colors.faint,
+  },
+  pressed: {
+    opacity: 0.6,
   },
 });
