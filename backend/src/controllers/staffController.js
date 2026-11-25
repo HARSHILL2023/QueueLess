@@ -33,11 +33,37 @@ const updateProfile = async (req, res, next) => {
   }
 };
 
+const isGlobalStaffUser = (user) => user?.role === 'staff' && user?.isGlobalStaff === true;
+
+/**
+ * Hospital context for read endpoints that have no hospital in their path.
+ * Global staff use the hospital they selected (validated by
+ * resolveHospitalContext); everyone else keeps their assigned hospital.
+ */
+const resolveScopedHospitalId = (req) => {
+  if (isGlobalStaffUser(req.user)) {
+    return (
+      req.selectedHospitalId ||
+      (req.user.hospitalId ? req.user.hospitalId.toString() : null) ||
+      null
+    );
+  }
+
+  return req.user.hospitalId || null;
+};
+
 const getDashboardStats = async (req, res, next) => {
   try {
-    const hospitalId = req.user.hospitalId;
-    const departmentId = req.user.departmentId;
+    const globalStaff = isGlobalStaffUser(req.user);
+    const hospitalId = resolveScopedHospitalId(req);
+    // A global staff account is not tied to one department, so its own
+    // department must never narrow the numbers of the selected hospital.
+    const departmentId = globalStaff ? null : req.user.departmentId;
     const today = getTodayString();
+
+    if (globalStaff && !hospitalId) {
+      return res.status(400).json({ error: 'Select a hospital to view its statistics.' });
+    }
 
     const query = { date: today };
     if (hospitalId) query.hospitalId = hospitalId;
@@ -76,13 +102,21 @@ const getDashboardStats = async (req, res, next) => {
 
 const getPatients = async (req, res, next) => {
   try {
-    const { hospitalId, departmentId, search, status, date } = req.query;
+    const { departmentId, search, status, date } = req.query;
+    // Only the validated context counts; raw query/header ids never do.
+    const hospitalId = req.selectedHospitalId || req.query?.hospitalId || null;
     const query = {};
 
     // Staff can only read patients from their own hospital. Platform admins may
     // query a specific hospital, or all hospitals when none is supplied.
     if (req.user.role === 'admin') {
       if (hospitalId) query.hospitalId = hospitalId;
+    } else if (isGlobalStaffUser(req.user)) {
+      const target = resolveScopedHospitalId(req);
+      if (!target) {
+        return res.status(400).json({ error: 'Select a hospital to view its patients.' });
+      }
+      query.hospitalId = target;
     } else {
       if (!req.user.hospitalId) {
         return res.status(403).json({ error: 'No hospital is assigned to your staff account.' });
@@ -117,6 +151,27 @@ const getPatients = async (req, res, next) => {
       .sort({ tokenNumber: 1 });
 
     res.json({ status: 'success', data: tokens });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Hospitals a global staff member may switch between. Automatic by design:
+ * the list is read live, so hospitals created or approved later appear here
+ * with no assignment step. Normal staff get 403 and keep their own workflow.
+ */
+const getHospitals = async (req, res, next) => {
+  try {
+    if (req.user.role !== 'admin' && !isGlobalStaffUser(req.user)) {
+      return res.status(403).json({ error: 'Global staff access required.' });
+    }
+
+    const hospitals = await Hospital.find()
+      .select('name code status isVerified address.city address.state')
+      .sort({ name: 1 });
+
+    res.json({ status: 'success', data: hospitals });
   } catch (error) {
     next(error);
   }
@@ -364,6 +419,7 @@ module.exports = {
   updateProfile,
   getDashboardStats,
   getPatients,
+  getHospitals,
   getHospitalStaff,
   inviteStaff,
   getInvitation,

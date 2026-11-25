@@ -8,6 +8,7 @@
     "dev": "nodemon src/server.js",
     "seed": "node src/scripts/seed.js",
     "seed:demo-staff": "node src/scripts/seedDemoStaff.js",
+    "grant:global-staff": "node src/scripts/grantGlobalStaff.js",
     "seed:admin": "node src/scripts/seedAdmin.js",
     "test": "jest --runInBand",
     "test:watch": "jest --watch"

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { HOSPITAL_SELECTION_KEY } from './hospital';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -17,6 +18,14 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    // Hospital a global staff account is currently managing. The backend
+    // validates it on every request; normal staff never set this key.
+    const selectedHospitalId = localStorage.getItem(HOSPITAL_SELECTION_KEY);
+    if (selectedHospitalId) {
+      config.headers['X-Hospital-Id'] = selectedHospitalId;
+    }
+
     return config;
   },
   (error) => Promise.reject(error)
@@ -74,7 +83,9 @@ export const authAPI = {
 export const staffAPI = {
   getProfile: () => api.get('/staff/profile'),
   updateProfile: (data) => api.patch('/staff/profile', data),
-  getDashboardStats: () => api.get('/staff/dashboard/stats'),
+  getDashboardStats: (params) => api.get('/staff/dashboard/stats', { params }),
+  // Hospitals available to a global staff account (403 for normal staff).
+  getHospitals: () => api.get('/staff/hospitals'),
 };
 
 // Queue API (Staff)

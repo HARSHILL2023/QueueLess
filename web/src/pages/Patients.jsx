@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { patientAPI } from '../services/api';
 
 export default function Patients() {
+  const { activeHospitalId } = useAuth();
   const [patients, setPatients] = useState([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -9,9 +11,16 @@ export default function Patients() {
   const [selectedPatient, setSelectedPatient] = useState(null);
 
   const fetchPatients = useCallback(async () => {
+    if (!activeHospitalId) {
+      setPatients([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       const res = await patientAPI.getPatients({
+        hospitalId: activeHospitalId,
         search: search || undefined,
         status: statusFilter || undefined,
       });
@@ -21,7 +30,7 @@ export default function Patients() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter]);
+  }, [activeHospitalId, search, statusFilter]);
 
   useEffect(() => {
     fetchPatients();

@@ -1,9 +1,12 @@
 import { Outlet, NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import HospitalSwitcher from './HospitalSwitcher';
 
 export default function Layout() {
-  const { user, logout } = useAuth();
-  const hospitalName = user?.hospitalId?.name || 'Hospital Console';
+  const { user, logout, isGlobalStaff } = useAuth();
+  const hospitalName = isGlobalStaff
+    ? 'All hospitals · global access'
+    : user?.hospitalId?.name || 'Hospital Console';
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', fontFamily: 'var(--font-sans)' }}>
@@ -32,6 +35,9 @@ export default function Layout() {
               {hospitalName}
             </div>
           </div>
+
+          {/* Global staff hospital selector (hidden for normal staff) */}
+          <HospitalSwitcher />
 
           {/* Navigation Links */}
           <nav style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>

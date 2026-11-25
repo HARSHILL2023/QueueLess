@@ -50,6 +50,13 @@ const userSchema = new mongoose.Schema(
       enum: ['admin', 'doctor', 'nurse', 'receptionist', 'staff', null],
       default: null,
     },
+    // Global staff may operate every hospital in the platform. It is a plain
+    // staff permission (never platform admin) and is only ever granted by
+    // src/scripts/grantGlobalStaff.js; no API accepts it from a client.
+    isGlobalStaff: {
+      type: Boolean,
+      default: false,
+    },
     isVerified: {
       type: Boolean,
       default: true,

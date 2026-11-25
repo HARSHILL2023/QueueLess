@@ -40,7 +40,7 @@ app.use(
   cors({
     origin: '*', // Allow web and mobile clients
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Hospital-Id'],
   })
 );
 if (process.env.NODE_ENV !== 'test') {

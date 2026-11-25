@@ -4,7 +4,7 @@ import { queueAPI, departmentAPI } from '../services/api';
 import { getSocket, joinDepartmentQueue, leaveDepartmentQueue } from '../services/socket';
 
 export default function QueueManagement() {
-  const { user } = useAuth();
+  const { user, activeHospitalId } = useAuth();
   const [departments, setDepartments] = useState([]);
   const [selectedDeptId, setSelectedDeptId] = useState('');
   const [queueData, setQueueData] = useState(null);
@@ -12,7 +12,7 @@ export default function QueueManagement() {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState(null);
 
-  const hospitalId = typeof user?.hospitalId === 'object' ? user.hospitalId._id : user?.hospitalId;
+  const hospitalId = activeHospitalId;
 
   // Load departments
   useEffect(() => {
@@ -27,6 +27,10 @@ export default function QueueManagement() {
             ? depts.find((d) => d._id === (typeof user.departmentId === 'object' ? user.departmentId._id : user.departmentId))
             : depts[0];
           setSelectedDeptId(defaultDept ? defaultDept._id : depts[0]._id);
+        } else {
+          // Switching to a hospital without departments must clear the old one.
+          setSelectedDeptId('');
+          setQueueData(null);
         }
       })
       .catch((err) => console.error('Error fetching departments:', err))
@@ -158,6 +162,12 @@ export default function QueueManagement() {
           </button>
         </div>
       </div>
+
+      {departments.length === 0 && (
+        <div className="card" style={{ marginBottom: '24px', textAlign: 'center', color: 'var(--color-slate-500)' }}>
+          This hospital has no departments yet. Add one from the Departments tab, then the queue appears here.
+        </div>
+      )}
 
       {actionMessage && (
         <div style={{

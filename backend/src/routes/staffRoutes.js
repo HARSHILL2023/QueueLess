@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const staffController = require('../controllers/staffController');
 const { authenticate } = require('../middleware/auth');
-const { authorize, requireHospitalStaff } = require('../middleware/roles');
+const { authorize, requireHospitalStaff, resolveHospitalContext } = require('../middleware/roles');
 const validate = require('../middleware/validate');
 const rateLimit = require('../middleware/rateLimiter');
 const { acceptInvitationSchema } = require('../validators/authValidators');
@@ -22,7 +22,7 @@ router.post(
   staffController.acceptInvitation
 );
 
-router.use(authenticate);
+router.use(authenticate, resolveHospitalContext);
 
 // Staff profile
 router.get('/profile', authorize('staff', 'admin'), staffController.getProfile);
@@ -33,6 +33,9 @@ router.get('/dashboard/stats', authorize('staff', 'admin'), staffController.getD
 
 // Patients view
 router.get('/patients', authorize('staff', 'admin'), staffController.getPatients);
+
+// Hospitals a global staff account may switch between (admins may also list)
+router.get('/hospitals', authorize('staff', 'admin'), staffController.getHospitals);
 
 // Staff management
 router.get('/hospital/:hospitalId', requireHospitalStaff, staffController.getHospitalStaff);

@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { staffManagementAPI, departmentAPI } from '../services/api';
 
 export default function Staff() {
-  const { user } = useAuth();
+  const { activeHospitalId } = useAuth();
   const [staffList, setStaffList] = useState([]);
   const [invitations, setInvitations] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -16,7 +16,7 @@ export default function Staff() {
   const [feedback, setFeedback] = useState(null);
   const [latestInvite, setLatestInvite] = useState(null);
 
-  const hospitalId = typeof user?.hospitalId === 'object' ? user.hospitalId._id : user?.hospitalId;
+  const hospitalId = activeHospitalId;
 
   const fetchStaffData = useCallback(async () => {
     if (!hospitalId) return;

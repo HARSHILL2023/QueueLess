@@ -1,11 +1,20 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const os = require('os');
+const crypto = require('crypto');
 
-const sanitize = (value) =>
-  String(value)
-    .replace(/[^a-zA-Z0-9_]/g, '_')
-    .slice(0, 48);
+const sanitize = (value) => String(value).replace(/[^a-zA-Z0-9_]/g, '_');
+
+/**
+ * MongoDB limits database names to 38 bytes (shared Atlas clusters reject
+ * longer ones), so the per-file suffix is a readable prefix plus a short hash
+ * of the full file name instead of the whole name.
+ */
+const testDatabaseName = (baseDb, testFile) => {
+  const hash = crypto.createHash('sha1').update(testFile).digest('hex').slice(0, 6);
+  const shortFile = sanitize(testFile).slice(0, 14).replace(/_+$/, '') || 'suite';
+  return `${sanitize(baseDb).slice(0, 9)}_test_${shortFile}_${hash}`.slice(0, 38);
+};
 
 /**
  * Build a dedicated database URI for this Jest test file.
@@ -35,7 +44,7 @@ const buildTestUri = () => {
     parsed.hostname = '127.0.0.1';
   }
 
-  parsed.pathname = `/${baseDb}_test_${testFile}`;
+  parsed.pathname = `/${testDatabaseName(baseDb, testFile)}`;
   return parsed.toString();
 };
 
@@ -56,9 +65,18 @@ beforeAll(async () => {
     });
   }
 
-  await mongoose.connection.db.dropDatabase();
+  // Clear documents instead of dropping the database: Atlas rejects writes
+  // with "database is in the process of being dropped" while an asynchronous
+  // drop is still settling, which made some suites fail intermittently.
+  const db = mongoose.connection.db;
+  const listed = db.listCollections();
+  // The driver returns a cursor in some versions and a plain array in others.
+  const collections = typeof listed?.toArray === 'function' ? await listed.toArray() : await listed;
+  await Promise.all(
+    (collections || []).map(({ name }) => db.collection(name).deleteMany({}))
+  );
 
-  // Rebuild unique indexes (e.g. token number per queue) after dropping the DB.
+  // Make sure unique indexes (e.g. token number per queue) exist.
   await Promise.all(Object.values(mongoose.models).map((model) => model.init()));
 }, 60000);
 

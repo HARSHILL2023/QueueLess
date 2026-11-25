@@ -5,7 +5,7 @@ import { getSocket } from '../services/socket';
 import { Link } from 'react-router-dom';
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, activeHospitalId, isGlobalStaff } = useAuth();
   const [stats, setStats] = useState({
     activeWaiting: 0,
     currentlyServing: 0,
@@ -20,13 +20,15 @@ export default function Dashboard() {
   const fetchDashboardData = useCallback(async () => {
     try {
       setError(null);
-      const statsRes = await staffAPI.getDashboardStats();
+      const statsRes = await staffAPI.getDashboardStats(
+        activeHospitalId ? { hospitalId: activeHospitalId } : undefined
+      );
       if (statsRes.data?.data) {
         setStats(statsRes.data.data);
       }
 
-      if (user?.hospitalId) {
-        const hospitalId = typeof user.hospitalId === 'object' ? user.hospitalId._id : user.hospitalId;
+      if (activeHospitalId) {
+        const hospitalId = activeHospitalId;
         const [deptsRes, queueStatusRes] = await Promise.all([
           departmentAPI.getDepartments(hospitalId).catch(() => ({ data: { data: [] } })),
           queueAPI.getQueueStatus(hospitalId).catch(() => ({ data: { data: [] } })),
@@ -43,7 +45,7 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [activeHospitalId]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -77,7 +79,10 @@ export default function Dashboard() {
             Hospital Dashboard
           </h1>
           <p style={{ color: 'var(--color-slate-500)', fontSize: '0.95rem' }}>
-            {user?.hospitalId?.name || 'Central Facility'} &bull; Welcome back, {user?.name || 'Staff Officer'}
+            {isGlobalStaff
+              ? 'All hospitals (global access)'
+              : user?.hospitalId?.name || 'Central Facility'}{' '}
+            &bull; Welcome back, {user?.name || 'Staff Officer'}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>

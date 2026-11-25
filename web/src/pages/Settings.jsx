@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { hospitalAPI } from '../services/api';
 
 export default function Settings() {
-  const { user } = useAuth();
+  const { activeHospitalId } = useAuth();
   const [hospital, setHospital] = useState(null);
   const [settings, setSettings] = useState({
     openTime: '08:00',
@@ -16,7 +16,7 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
-  const hospitalId = typeof user?.hospitalId === 'object' ? user.hospitalId._id : user?.hospitalId;
+  const hospitalId = activeHospitalId;
 
   useEffect(() => {
     if (!hospitalId) return;

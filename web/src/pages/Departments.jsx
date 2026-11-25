@@ -13,7 +13,7 @@ const emptyForm = {
 };
 
 export default function Departments() {
-  const { user } = useAuth();
+  const { activeHospitalId } = useAuth();
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -31,7 +31,7 @@ export default function Departments() {
   const [confirmCode, setConfirmCode] = useState('');
   const [removing, setRemoving] = useState(false);
 
-  const hospitalId = typeof user?.hospitalId === 'object' ? user.hospitalId._id : user?.hospitalId;
+  const hospitalId = activeHospitalId;
 
   const fetchDepartments = useCallback(async () => {
     if (!hospitalId) return;
