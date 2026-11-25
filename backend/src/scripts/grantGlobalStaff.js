@@ -26,7 +26,7 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 const User = require('../models/User');
 
-const GLOBAL_STAFF_EMAIL = 'demo@hospital.com';
+const GLOBAL_STAFF_EMAIL = 'staff@hospital.com';
 
 const args = new Set(process.argv.slice(2));
 const APPLY = args.has('--apply');
@@ -125,3 +125,4 @@ run()
     console.error('Granting global staff access failed:', error.message);
     process.exitCode = 1;
   });
+
